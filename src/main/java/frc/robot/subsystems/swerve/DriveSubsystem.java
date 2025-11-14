@@ -32,7 +32,6 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
-import frc.robot.Constants;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.swerve.gyro.GyroIO;
 import frc.robot.subsystems.swerve.gyro.GyroIOInputsAutoLogged;
@@ -81,7 +80,7 @@ public class DriveSubsystem extends SubsystemBase {
   private final Module[] modules = new Module[4]; // FL, FR, BL, BR
   private final SysIdRoutine sysId;
   private final Alert gyroDisconnectedAlert =
-      new Alert("Disconnected gyro, using kinematics as fallback.", Alert.AlertType.kError);
+      new Alert("Disconnected gyro, using kinematics.", Alert.AlertType.kError);
 
   private final SwerveDriveKinematics kinematics =
       new SwerveDriveKinematics(getModuleTranslations());
@@ -230,7 +229,7 @@ public class DriveSubsystem extends SubsystemBase {
     }
 
     // Update gyro alert
-    gyroDisconnectedAlert.set(!gyroInputs.connected && Constants.currentMode != Constants.Mode.SIM);
+    gyroDisconnectedAlert.set(!gyroInputs.connected);
   }
 
   /**
