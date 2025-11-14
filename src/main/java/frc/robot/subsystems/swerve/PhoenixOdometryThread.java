@@ -116,6 +116,10 @@ public class PhoenixOdometryThread extends Thread {
   @SuppressWarnings({"BusyWait", "CallToPrintStackTrace", "InfiniteLoopStatement"})
   @Override
   public void run() {
+    // DO NOT COPY UNLESS YOU UNDERSTAND THE CONSEQUENCES
+    // https://docs.advantagekit.org/getting-started/template-projects/spark-swerve-template#real-time-thread-priority
+    // Threads.setCurrentThreadPriority(true, 1);
+
     while (true) {
       // Wait for updates from all signals
       signalsLock.lock();
