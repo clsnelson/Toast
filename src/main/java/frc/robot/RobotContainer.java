@@ -141,6 +141,12 @@ public class RobotContainer {
                             new Pose2d(drivetrain.getPose().getTranslation(), new Rotation2d())),
                     drivetrain)
                 .ignoringDisable(true));
+
+    // Feedforward characterization
+    driver.x().whileTrue(DriveCommands.feedforwardCharacterization(drivetrain));
+
+    // Wheel radius characterization
+    driver.b().whileTrue(DriveCommands.wheelRadiusCharacterization(drivetrain));
   }
 
   private void setupPathPlanner() {
@@ -159,12 +165,6 @@ public class RobotContainer {
         drivetrain
             .run(() -> DriveCommands.robotRelative(drivetrain, () -> 0.25, () -> 0, () -> 0))
             .withTimeout(1.0));
-    autoChooser.addOption(
-        "Feedforward Characterization",
-        drivetrain.run(() -> DriveCommands.feedforwardCharacterization(drivetrain)));
-    autoChooser.addOption(
-        "Wheel Radius Characterization",
-        drivetrain.run(() -> DriveCommands.wheelRadiusCharacterization(drivetrain)));
   }
 
   public void readyRobotForMatch() {

@@ -15,6 +15,7 @@ package frc.robot.commands;
 
 import static edu.wpi.first.math.MathUtil.applyDeadband;
 
+import com.ctre.phoenix6.swerve.SwerveModuleConstants;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.filter.SlewRateLimiter;
@@ -27,10 +28,13 @@ import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.ConditionalCommand;
 import frc.robot.Constants;
+import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.swerve.DriveSubsystem;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
@@ -365,60 +369,71 @@ public class DriveCommands {
   /**
    * Measures the velocity feedforward constants for the drive motors.
    *
-   * <p>This command should only be used in voltage control mode.
+   * <p>This command can only be used in voltage control mode.
    */
   public static Command feedforwardCharacterization(DriveSubsystem driveSubsystem) {
     List<Double> velocitySamples = new LinkedList<>();
     List<Double> voltageSamples = new LinkedList<>();
     Timer timer = new Timer();
 
-    return Commands.sequence(
-            // Reset data
+    return new ConditionalCommand(
+            Commands.sequence(
+                // Reset data
+                Commands.runOnce(
+                    () -> {
+                      velocitySamples.clear();
+                      voltageSamples.clear();
+                    }),
+
+                // Allow modules to orient
+                Commands.run(() -> driveSubsystem.runCharacterization(0.0), driveSubsystem)
+                    .withTimeout(FF_START_DELAY),
+
+                // Start timer
+                Commands.runOnce(timer::restart),
+
+                // Accelerate and gather data
+                Commands.run(
+                        () -> {
+                          double voltage = timer.get() * FF_RAMP_RATE;
+                          driveSubsystem.runCharacterization(voltage);
+                          velocitySamples.add(driveSubsystem.getFFCharacterizationVelocity());
+                          voltageSamples.add(voltage);
+                        },
+                        driveSubsystem)
+
+                    // When cancelled, calculate and print results
+                    .finallyDo(
+                        () -> {
+                          int n = velocitySamples.size();
+                          double sumX = 0.0;
+                          double sumY = 0.0;
+                          double sumXY = 0.0;
+                          double sumX2 = 0.0;
+                          for (int i = 0; i < n; i++) {
+                            sumX += velocitySamples.get(i);
+                            sumY += voltageSamples.get(i);
+                            sumXY += velocitySamples.get(i) * voltageSamples.get(i);
+                            sumX2 += velocitySamples.get(i) * velocitySamples.get(i);
+                          }
+                          double kS = (sumY * sumX2 - sumX * sumXY) / (n * sumX2 - sumX * sumX);
+                          double kV = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+
+                          NumberFormat formatter = new DecimalFormat("#0.00000");
+                          System.out.println(
+                              "********** Drive FF Characterization Results **********");
+                          System.out.println("\tkS: " + formatter.format(kS));
+                          System.out.println("\tkV: " + formatter.format(kV));
+                        })),
+            // Throw exception if incorrect ClosedLoopOutputType
             Commands.runOnce(
                 () -> {
-                  velocitySamples.clear();
-                  voltageSamples.clear();
+                  throw new RuntimeException("Drive motor ClosedLoopOutputType must be Voltage.");
                 }),
-
-            // Allow modules to orient
-            Commands.run(() -> driveSubsystem.runCharacterization(0.0), driveSubsystem)
-                .withTimeout(FF_START_DELAY),
-
-            // Start timer
-            Commands.runOnce(timer::restart),
-
-            // Accelerate and gather data
-            Commands.run(
-                    () -> {
-                      double voltage = timer.get() * FF_RAMP_RATE;
-                      driveSubsystem.runCharacterization(voltage);
-                      velocitySamples.add(driveSubsystem.getFFCharacterizationVelocity());
-                      voltageSamples.add(voltage);
-                    },
-                    driveSubsystem)
-
-                // When cancelled, calculate and print results
-                .finallyDo(
-                    () -> {
-                      int n = velocitySamples.size();
-                      double sumX = 0.0;
-                      double sumY = 0.0;
-                      double sumXY = 0.0;
-                      double sumX2 = 0.0;
-                      for (int i = 0; i < n; i++) {
-                        sumX += velocitySamples.get(i);
-                        sumY += voltageSamples.get(i);
-                        sumXY += velocitySamples.get(i) * voltageSamples.get(i);
-                        sumX2 += velocitySamples.get(i) * velocitySamples.get(i);
-                      }
-                      double kS = (sumY * sumX2 - sumX * sumXY) / (n * sumX2 - sumX * sumX);
-                      double kV = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-
-                      NumberFormat formatter = new DecimalFormat("#0.00000");
-                      System.out.println("********** Drive FF Characterization Results **********");
-                      System.out.println("\tkS: " + formatter.format(kS));
-                      System.out.println("\tkV: " + formatter.format(kV));
-                    }))
+            () ->
+                TunerConstants.kDriveClosedLoopOutput
+                        == SwerveModuleConstants.ClosedLoopOutputType.Voltage
+                    || RobotBase.isSimulation())
         .withName("Feedforward Characterization");
   }
 
