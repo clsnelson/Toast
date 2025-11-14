@@ -1,6 +1,8 @@
 package frc.robot;
 
+import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.commands.PathPlannerAuto;
+import com.pathplanner.lib.util.FlippingUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.Filesystem;
@@ -167,7 +169,9 @@ public class RobotContainer {
 
   public void readyRobotForMatch() {
     if (autoChooser.get() instanceof PathPlannerAuto auto) {
-      drivetrain.setPose(auto.getStartingPose());
+      if (AutoBuilder.shouldFlip())
+        drivetrain.setPose(FlippingUtil.flipFieldPose(auto.getStartingPose()));
+      else drivetrain.setPose(auto.getStartingPose());
     }
   }
 
