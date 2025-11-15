@@ -42,6 +42,10 @@ public class ModuleIOTalonFX implements ModuleIO {
   private final TalonFX turnTalon;
   private final CANcoder cancoder;
 
+  // Config
+  private final TalonFXConfiguration driveConfig;
+  private final TalonFXConfiguration turnConfig;
+
   // Voltage control requests
   private final VoltageOut voltageRequest = new VoltageOut(0);
   private final PositionVoltage positionVoltageRequest = new PositionVoltage(0.0);
@@ -89,7 +93,7 @@ public class ModuleIOTalonFX implements ModuleIO {
     cancoder = new CANcoder(constants.EncoderId, TunerConstants.DrivetrainConstants.CANBusName);
 
     // Configure drive motor
-    var driveConfig = constants.DriveMotorInitialConfigs;
+    driveConfig = constants.DriveMotorInitialConfigs;
     driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     driveConfig.Slot0 = constants.DriveMotorGains;
     driveConfig.Feedback.SensorToMechanismRatio = constants.DriveMotorGearRatio;
@@ -105,7 +109,7 @@ public class ModuleIOTalonFX implements ModuleIO {
     tryUntilOk(5, () -> driveTalon.setPosition(0.0, 0.25));
 
     // Configure turn motor
-    var turnConfig = new TalonFXConfiguration();
+    turnConfig = constants.SteerMotorInitialConfigs;
     turnConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     turnConfig.Slot0 = constants.SteerMotorGains;
     turnConfig.Feedback.FeedbackRemoteSensorID = constants.EncoderId;
@@ -114,9 +118,7 @@ public class ModuleIOTalonFX implements ModuleIO {
           case RemoteCANcoder -> FeedbackSensorSourceValue.RemoteCANcoder;
           case FusedCANcoder -> FeedbackSensorSourceValue.FusedCANcoder;
           case SyncCANcoder -> FeedbackSensorSourceValue.SyncCANcoder;
-          default ->
-              throw new RuntimeException(
-                  "You have selected a turn feedback source that is not supported by the default implementation of ModuleIOTalonFX. Please check the AdvantageKit documentation for more information on alternative configurations: https://docs.advantagekit.org/getting-started/template-projects/talonfx-swerve-template#custom-module-implementations");
+          default -> throw new RuntimeException("FeedbackSource not supported.");
         };
     turnConfig.Feedback.RotorToSensorRatio = constants.SteerMotorGearRatio;
     turnConfig.MotionMagic.MotionMagicCruiseVelocity = 100.0 / constants.SteerMotorGearRatio;
@@ -138,7 +140,7 @@ public class ModuleIOTalonFX implements ModuleIO {
         constants.EncoderInverted
             ? SensorDirectionValue.Clockwise_Positive
             : SensorDirectionValue.CounterClockwise_Positive;
-    cancoder.getConfigurator().apply(cancoderConfig);
+    tryUntilOk(5, () -> cancoder.getConfigurator().apply(cancoderConfig, 0.25));
 
     // Create timestamp queue
     timestampQueue = PhoenixOdometryThread.getInstance().makeTimestampQueue();
@@ -245,5 +247,21 @@ public class ModuleIOTalonFX implements ModuleIO {
           case TorqueCurrentFOC ->
               positionTorqueCurrentRequest.withPosition(rotation.getRotations());
         });
+  }
+
+  @Override
+  public void setDrivePID(double kP, double kI, double kD) {
+    driveConfig.Slot0.kP = kP;
+    driveConfig.Slot0.kI = kI;
+    driveConfig.Slot0.kD = kD;
+    tryUntilOk(5, () -> driveTalon.getConfigurator().apply(driveConfig, 0.25));
+  }
+
+  @Override
+  public void setTurnPID(double kP, double kI, double kD) {
+    turnConfig.Slot0.kP = kP;
+    turnConfig.Slot0.kI = kI;
+    turnConfig.Slot0.kD = kD;
+    tryUntilOk(5, () -> turnTalon.getConfigurator().apply(turnConfig, 0.25));
   }
 }

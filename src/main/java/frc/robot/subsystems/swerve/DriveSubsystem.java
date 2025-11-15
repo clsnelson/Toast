@@ -38,6 +38,7 @@ import frc.robot.subsystems.swerve.gyro.GyroIOInputsAutoLogged;
 import frc.robot.subsystems.swerve.module.Module;
 import frc.robot.subsystems.swerve.module.ModuleIO;
 import frc.robot.util.LocalADStarAK;
+import frc.robot.util.LoggedTracer;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -179,9 +180,15 @@ public class DriveSubsystem extends SubsystemBase {
     gyroIO.updateInputs(gyroInputs);
     Logger.processInputs("Drive/Gyro", gyroInputs);
     for (var module : modules) {
-      module.periodic();
+      module.updateInputs();
     }
     odometryLock.unlock();
+    LoggedTracer.record("Drive/Inputs");
+
+    // Call periodic on modules
+    for (var module : modules) {
+      module.periodic();
+    }
 
     // Stop moving when disabled
     if (DriverStation.isDisabled()) {

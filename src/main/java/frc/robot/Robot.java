@@ -6,12 +6,11 @@ package frc.robot;
 
 import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.net.WebServer;
-import edu.wpi.first.networktables.NetworkTable;
-import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.lib.Elastic;
+import frc.robot.util.LoggedTracer;
 import org.ironmaple.simulation.SimulatedArena;
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
@@ -28,6 +27,7 @@ public class Robot extends LoggedRobot {
 
   public Robot() {
     // Set up data receivers & replay source
+    Logger.recordMetadata("tuningMode", String.valueOf(Constants.tuningMode));
     switch (Constants.currentMode) {
       case REAL:
         // Running on a real robot, log to a USB stick ("/U/logs")
@@ -65,14 +65,13 @@ public class Robot extends LoggedRobot {
     // (https://frc-elastic.gitbook.io/docs/additional-features-and-references/remote-layout-downloading)
     WebServer.start(5800, Filesystem.getDeployDirectory().toString());
 
-    // Setup Match Time widget on NT
-    NetworkTable dashboardNT = NetworkTableInstance.getDefault().getTable("Elastic");
-
     m_robotContainer = new RobotContainer();
   }
 
   @Override
   public void robotPeriodic() {
+    LoggedTracer.reset();
+
     CommandScheduler.getInstance().run();
   }
 
