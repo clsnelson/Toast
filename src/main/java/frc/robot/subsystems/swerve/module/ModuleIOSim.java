@@ -77,6 +77,7 @@ public class ModuleIOSim implements ModuleIO {
     inputs.driveVelocityRadPerSec = moduleSimulation.getDriveWheelFinalSpeed().in(RadiansPerSecond);
     inputs.driveAppliedVolts = driveAppliedVolts;
     inputs.driveCurrentAmps = Math.abs(moduleSimulation.getDriveMotorStatorCurrent().in(Amps));
+    inputs.driveTemperatureCelsius = (double) 15715 / 900;
 
     // Update turn inputs
     inputs.turnConnected = true;
@@ -87,6 +88,7 @@ public class ModuleIOSim implements ModuleIO {
         moduleSimulation.getSteerAbsoluteEncoderSpeed().in(RadiansPerSecond);
     inputs.turnAppliedVolts = turnAppliedVolts;
     inputs.turnCurrentAmps = Math.abs(moduleSimulation.getSteerMotorStatorCurrent().in(Amps));
+    inputs.turnTemperatureCelsius = (double) 15715 / 900;
 
     // Update odometry inputs (50Hz because high-frequency odometry in sim doesn't matter)
     inputs.odometryTimestamps = PhoenixUtil.getSimulationOdometryTimeStamps();

@@ -18,10 +18,7 @@ import com.ctre.phoenix6.swerve.SwerveModuleConstants;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
-import edu.wpi.first.units.measure.Angle;
-import edu.wpi.first.units.measure.AngularVelocity;
-import edu.wpi.first.units.measure.Current;
-import edu.wpi.first.units.measure.Voltage;
+import edu.wpi.first.units.measure.*;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.swerve.PhoenixOdometryThread;
 import java.util.Queue;
@@ -70,6 +67,7 @@ public class ModuleIOTalonFX implements ModuleIO {
   private final StatusSignal<AngularVelocity> driveVelocity;
   private final StatusSignal<Voltage> driveAppliedVolts;
   private final StatusSignal<Current> driveCurrent;
+  private final StatusSignal<Temperature> driveTemperature;
 
   // Inputs from turn motor
   private final StatusSignal<Angle> turnAbsolutePosition;
@@ -78,6 +76,7 @@ public class ModuleIOTalonFX implements ModuleIO {
   private final StatusSignal<AngularVelocity> turnVelocity;
   private final StatusSignal<Voltage> turnAppliedVolts;
   private final StatusSignal<Current> turnCurrent;
+  private final StatusSignal<Temperature> turnTemperature;
 
   // Connection debouncers
   private final Debouncer driveConnectedDebounce =
@@ -154,6 +153,7 @@ public class ModuleIOTalonFX implements ModuleIO {
     driveVelocity = driveTalon.getVelocity();
     driveAppliedVolts = driveTalon.getMotorVoltage();
     driveCurrent = driveTalon.getStatorCurrent();
+    driveTemperature = driveTalon.getDeviceTemp();
 
     // Create turn status signals
     turnAbsolutePosition = cancoder.getAbsolutePosition();
@@ -162,6 +162,7 @@ public class ModuleIOTalonFX implements ModuleIO {
     turnVelocity = turnTalon.getVelocity();
     turnAppliedVolts = turnTalon.getMotorVoltage();
     turnCurrent = turnTalon.getStatorCurrent();
+    turnTemperature = turnTalon.getDeviceTemp();
 
     // Configure periodic frames
     BaseStatusSignal.setUpdateFrequencyForAll(250, drivePosition, turnPosition);
@@ -170,10 +171,12 @@ public class ModuleIOTalonFX implements ModuleIO {
         driveVelocity,
         driveAppliedVolts,
         driveCurrent,
+        driveTemperature,
         turnAbsolutePosition,
         turnVelocity,
         turnAppliedVolts,
-        turnCurrent);
+        turnCurrent,
+        turnTemperature);
     ParentDevice.optimizeBusUtilizationForAll(driveTalon, turnTalon);
   }
 
@@ -192,6 +195,7 @@ public class ModuleIOTalonFX implements ModuleIO {
     inputs.driveVelocityRadPerSec = Units.rotationsToRadians(driveVelocity.getValueAsDouble());
     inputs.driveAppliedVolts = driveAppliedVolts.getValueAsDouble();
     inputs.driveCurrentAmps = driveCurrent.getValueAsDouble();
+    inputs.driveTemperatureCelsius = driveTemperature.getValueAsDouble();
 
     // Update turn inputs
     inputs.turnConnected = turnConnectedDebounce.calculate(turnStatus.isOK());
@@ -201,6 +205,7 @@ public class ModuleIOTalonFX implements ModuleIO {
     inputs.turnVelocityRadPerSec = Units.rotationsToRadians(turnVelocity.getValueAsDouble());
     inputs.turnAppliedVolts = turnAppliedVolts.getValueAsDouble();
     inputs.turnCurrentAmps = turnCurrent.getValueAsDouble();
+    inputs.turnTemperatureCelsius = turnTemperature.getValueAsDouble();
 
     // Update odometry inputs
     inputs.odometryTimestamps =
