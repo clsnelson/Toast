@@ -26,8 +26,11 @@ public class Robot extends LoggedRobot {
   private Command currentAuto;
 
   public Robot() {
+    // Record metadata
+    Logger.recordMetadata("TuningMode", Boolean.toString(Constants.tuningMode));
+    Logger.recordMetadata("RuntimeType", getRuntimeType().toString());
+
     // Set up data receivers & replay source
-    Logger.recordMetadata("tuningMode", String.valueOf(Constants.tuningMode));
     switch (Constants.currentMode) {
       case REAL:
         // Running on a real robot, log to a USB stick ("/U/logs")
