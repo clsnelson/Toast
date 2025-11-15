@@ -36,6 +36,7 @@ import edu.wpi.first.wpilibj2.command.ConditionalCommand;
 import frc.robot.Constants;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.swerve.DriveSubsystem;
+import frc.robot.util.LoggedTunableNumber;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.*;
@@ -53,6 +54,8 @@ public class DriveCommands {
   private static final double FF_RAMP_RATE = 0.1; // Volts/Sec
   private static final double WHEEL_RADIUS_MAX_VELOCITY = 0.25; // Rad/Sec
   private static final double WHEEL_RADIUS_RAMP_RATE = 0.05; // Rad/Sec^2
+  private static final LoggedTunableNumber SKEW_COMPENSATION_SCALAR =
+      new LoggedTunableNumber("Drive/SkewCompensationScalar", -0.05);
 
   /** Enum describing which branch side to target */
   public enum BranchSide {
@@ -304,11 +307,23 @@ public class DriveCommands {
     // Square rotation value for more precise control
     omega = Math.copySign(omega * omega, omega);
 
-    // Convert to field relative speeds & send command
-    return new ChassisSpeeds(
-        linearVelocity.getX() * driveSubsystem.getMaxLinearSpeedMetersPerSec(),
-        linearVelocity.getY() * driveSubsystem.getMaxLinearSpeedMetersPerSec(),
-        omega * driveSubsystem.getMaxAngularSpeedRadPerSec());
+    // When translating and rotating, a slight translational skew can be noticed. This mitigates the
+    // issue during teleop.
+    Rotation2d skewCompensationFactor =
+        Rotation2d.fromRadians(
+            driveSubsystem.getChassisSpeeds().omegaRadiansPerSecond
+                * SKEW_COMPENSATION_SCALAR.get());
+
+    // Get field speeds, convert to robot-relative, then convert back to field speeds with skew
+    // compensated.
+    return ChassisSpeeds.fromRobotRelativeSpeeds(
+        ChassisSpeeds.fromFieldRelativeSpeeds(
+            new ChassisSpeeds(
+                linearVelocity.getX() * driveSubsystem.getMaxLinearSpeedMetersPerSec(),
+                linearVelocity.getY() * driveSubsystem.getMaxLinearSpeedMetersPerSec(),
+                omega * driveSubsystem.getMaxAngularSpeedRadPerSec()),
+            driveSubsystem.getPose().getRotation()),
+        driveSubsystem.getPose().getRotation().plus(skewCompensationFactor));
   }
 
   /**

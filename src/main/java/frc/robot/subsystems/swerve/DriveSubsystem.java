@@ -287,6 +287,7 @@ public class DriveSubsystem extends SubsystemBase {
 
     // Update gyro alert
     gyroDisconnectedAlert.set(!gyroInputs.connected);
+    LoggedTracer.record("Drive/Periodic");
   }
 
   /** Set brake mode to {@code enabled} doesn't change brake mode if already set. */
