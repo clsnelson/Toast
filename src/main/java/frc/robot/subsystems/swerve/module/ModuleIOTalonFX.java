@@ -25,6 +25,8 @@ import edu.wpi.first.units.measure.Voltage;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.swerve.PhoenixOdometryThread;
 import java.util.Queue;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 /**
  * Module IO implementation for Talon FX drive motor controller, Talon FX turn motor controller, and
@@ -45,6 +47,7 @@ public class ModuleIOTalonFX implements ModuleIO {
   // Config
   private final TalonFXConfiguration driveConfig;
   private final TalonFXConfiguration turnConfig;
+  private static final Executor brakeModeExecutor = Executors.newFixedThreadPool(8);
 
   // Voltage control requests
   private final VoltageOut voltageRequest = new VoltageOut(0);
@@ -267,5 +270,25 @@ public class ModuleIOTalonFX implements ModuleIO {
     turnConfig.Slot0.kI = kI;
     turnConfig.Slot0.kD = kD;
     tryUntilOk(5, () -> turnTalon.getConfigurator().apply(turnConfig, 0.25));
+  }
+
+  @Override
+  public void setBrakeMode(boolean enabled) {
+    brakeModeExecutor.execute(
+        () -> {
+          synchronized (driveConfig) {
+            driveConfig.MotorOutput.NeutralMode =
+                enabled ? NeutralModeValue.Brake : NeutralModeValue.Coast;
+            tryUntilOk(5, () -> driveTalon.getConfigurator().apply(driveConfig, 0.25));
+          }
+        });
+    brakeModeExecutor.execute(
+        () -> {
+          synchronized (turnConfig) {
+            turnConfig.MotorOutput.NeutralMode =
+                enabled ? NeutralModeValue.Brake : NeutralModeValue.Coast;
+            tryUntilOk(5, () -> turnTalon.getConfigurator().apply(turnConfig, 0.25));
+          }
+        });
   }
 }

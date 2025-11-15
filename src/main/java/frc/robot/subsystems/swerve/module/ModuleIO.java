@@ -45,4 +45,7 @@ public interface ModuleIO {
 
   /** Set P, I, and D gains for closed loop control on turn motor. */
   default void setTurnPID(double kP, double kI, double kD) {}
+
+  /** Set brake mode on drive motor */
+  default void setBrakeMode(boolean enabled) {}
 }

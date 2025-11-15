@@ -29,6 +29,7 @@ import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
@@ -39,6 +40,8 @@ import frc.robot.subsystems.swerve.module.Module;
 import frc.robot.subsystems.swerve.module.ModuleIO;
 import frc.robot.util.LocalADStarAK;
 import frc.robot.util.LoggedTracer;
+import frc.robot.util.LoggedTunableNumber;
+import java.util.Arrays;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -83,8 +86,18 @@ public class DriveSubsystem extends SubsystemBase {
   private final Alert gyroDisconnectedAlert =
       new Alert("Disconnected gyro, using kinematics.", Alert.AlertType.kError);
 
+  private static final LoggedTunableNumber coastWaitTime =
+      new LoggedTunableNumber("Drive/CoastWaitTimeSeconds", 0.5);
+  private static final LoggedTunableNumber coastMetersPerSecondThreshold =
+      new LoggedTunableNumber("Drive/CoastMetersPerSecThreshold", .05);
+
+  private final Timer lastMovementTimer = new Timer();
+
   private final SwerveDriveKinematics kinematics =
       new SwerveDriveKinematics(getModuleTranslations());
+
+  @AutoLogOutput(key = "Drive/BrakeModeEnabled")
+  private boolean brakeModeEnabled = true;
 
   private Rotation2d rawGyroRotation = Rotation2d.kZero;
   private final SwerveModulePosition[] lastModulePositions = // For delta tracking
@@ -128,6 +141,9 @@ public class DriveSubsystem extends SubsystemBase {
     modules[2] = new Module(blModuleIO, "BackLeft", TunerConstants.BackLeft);
     modules[3] = new Module(brModuleIO, "BackRight", TunerConstants.BackRight);
     this.resetSimulationPoseCallback = resetSimulationPoseCallback;
+
+    lastMovementTimer.start();
+    setBrakeMode(true);
 
     // Usage reporting for swerve template
     HAL.report(
@@ -173,6 +189,15 @@ public class DriveSubsystem extends SubsystemBase {
             new SysIdRoutine.Mechanism(
                 (voltage) -> runCharacterization(voltage.in(Volts)), null, this));
   }
+
+  public enum CoastRequest {
+    AUTOMATIC,
+    ALWAYS_BRAKE,
+    ALWAYS_COAST
+  }
+
+  @AutoLogOutput(key = "Drive/CoastRequest")
+  private CoastRequest coastRequest = CoastRequest.AUTOMATIC;
 
   @Override
   public void periodic() {
@@ -235,8 +260,41 @@ public class DriveSubsystem extends SubsystemBase {
       poseEstimator.updateWithTime(sampleTimestamps[i], rawGyroRotation, modulePositions);
     }
 
+    // Update brake mode
+    // Reset movement timer if velocity above threshold
+    if (Arrays.stream(modules)
+        .anyMatch(
+            (module) ->
+                Math.abs(module.getVelocityMetersPerSec()) > coastMetersPerSecondThreshold.get())) {
+      lastMovementTimer.reset();
+    }
+
+    if (DriverStation.isEnabled() && DriverStation.isFMSAttached()) {
+      coastRequest = CoastRequest.ALWAYS_BRAKE;
+    }
+
+    switch (coastRequest) {
+      case AUTOMATIC -> {
+        if (DriverStation.isEnabled()) {
+          setBrakeMode(true);
+        } else if (lastMovementTimer.hasElapsed(coastWaitTime.get())) {
+          setBrakeMode(false);
+        }
+      }
+      case ALWAYS_BRAKE -> setBrakeMode(true);
+      case ALWAYS_COAST -> setBrakeMode(false);
+    }
+
     // Update gyro alert
     gyroDisconnectedAlert.set(!gyroInputs.connected);
+  }
+
+  /** Set brake mode to {@code enabled} doesn't change brake mode if already set. */
+  private void setBrakeMode(boolean enabled) {
+    if (brakeModeEnabled != enabled) {
+      Arrays.stream(modules).forEach(module -> module.setBrakeMode(enabled));
+    }
+    brakeModeEnabled = enabled;
   }
 
   /**

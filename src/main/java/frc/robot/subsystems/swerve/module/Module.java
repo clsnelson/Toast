@@ -126,7 +126,7 @@ public class Module {
     double speedRadPerSec = state.speedMetersPerSecond / constants.WheelRadius;
     io.setDriveVelocity(speedRadPerSec, ffModel.calculate(speedRadPerSec));
 
-    // Prevent wheel turning from messing
+    // Prevent wheel turning from messing with alignment
     if (Math.abs(state.angle.minus(getAngle()).getDegrees()) < 0.3) {
       io.setTurnOpenLoop(0.0);
     } else {
@@ -143,6 +143,8 @@ public class Module {
     double speedRadPerSec = state.speedMetersPerSecond / constants.WheelRadius;
     io.setDriveVelocity(
         speedRadPerSec, ffModel.calculate(speedRadPerSec) + wheelTorqueNm * drivekT.get());
+
+    // Prevent wheel turning from messing with alignment
     if (Math.abs(state.angle.minus(getAngle()).getDegrees()) < 0.3) {
       io.setTurnOpenLoop(0.0);
     } else {
@@ -205,5 +207,10 @@ public class Module {
   /** Returns the module velocity in rotations/sec (Phoenix native units). */
   public double getFFCharacterizationVelocity() {
     return Units.radiansToRotations(inputs.driveVelocityRadPerSec);
+  }
+
+  /* Sets brake mode to {@code enabled} */
+  public void setBrakeMode(boolean enabled) {
+    io.setBrakeMode(enabled);
   }
 }
