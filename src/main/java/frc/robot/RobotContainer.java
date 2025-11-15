@@ -138,7 +138,10 @@ public class RobotContainer {
             Commands.runOnce(
                     () ->
                         drivetrain.setPose(
-                            new Pose2d(drivetrain.getPose().getTranslation(), new Rotation2d())),
+                            new Pose2d(
+                                drivetrain.getPose().getTranslation(),
+                                Rotation2d.kZero.plus(
+                                    AutoBuilder.shouldFlip() ? Rotation2d.kPi : Rotation2d.kZero))),
                     drivetrain)
                 .ignoringDisable(true));
 
