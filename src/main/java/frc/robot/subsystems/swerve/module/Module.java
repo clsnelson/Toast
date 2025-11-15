@@ -7,6 +7,7 @@ import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Alert;
 import frc.robot.Constants;
@@ -34,6 +35,8 @@ public class Module {
       var driveGains = TunerConstants.driveGains;
       drivekS.initDefault(driveGains.kS);
       drivekV.initDefault(driveGains.kV);
+      // Multiplied by desired wheelTorqueNm
+      drivekT.initDefault(TunerConstants.kDriveGearRatio / DCMotor.getKrakenX60Foc(1).KtNMPerAmp);
       drivekP.initDefault(driveGains.kP);
       drivekD.initDefault(driveGains.kD);
 
@@ -117,15 +120,34 @@ public class Module {
     turnEncoderDisconnectedAlert.set(!inputs.turnEncoderConnected);
   }
 
-  /** Runs the module with the specified setpoint state. Mutates the state to optimize it. */
+  /** Runs the module with the specified setpoint state. */
   public void runSetpoint(SwerveModuleState state) {
-    // Optimize velocity setpoint
-    state.optimize(getAngle());
-    state.cosineScale(inputs.turnPosition);
-
     // Apply setpoints
-    io.setDriveVelocity(state.speedMetersPerSecond / constants.WheelRadius);
-    io.setTurnPosition(state.angle);
+    double speedRadPerSec = state.speedMetersPerSecond / constants.WheelRadius;
+    io.setDriveVelocity(speedRadPerSec, ffModel.calculate(speedRadPerSec));
+
+    // Prevent wheel turning from messing
+    if (Math.abs(state.angle.minus(getAngle()).getDegrees()) < 0.3) {
+      io.setTurnOpenLoop(0.0);
+    } else {
+      io.setTurnPosition(state.angle);
+    }
+  }
+
+  /**
+   * Runs the module with the specified setpoint state and a setpoint wheel force used for
+   * torque-based feedforward.
+   */
+  public void runSetpoint(SwerveModuleState state, double wheelTorqueNm) {
+    // Apply setpoints
+    double speedRadPerSec = state.speedMetersPerSecond / constants.WheelRadius;
+    io.setDriveVelocity(
+        speedRadPerSec, ffModel.calculate(speedRadPerSec) + wheelTorqueNm * drivekT.get());
+    if (Math.abs(state.angle.minus(getAngle()).getDegrees()) < 0.3) {
+      io.setTurnOpenLoop(0.0);
+    } else {
+      io.setTurnPosition(state.angle);
+    }
   }
 
   /** Runs the module with the specified output while controlling to zero degrees. */

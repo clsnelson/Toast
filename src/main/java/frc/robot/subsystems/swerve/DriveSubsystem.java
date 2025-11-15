@@ -98,7 +98,7 @@ public class DriveSubsystem extends SubsystemBase {
       new SwerveDrivePoseEstimator(kinematics, rawGyroRotation, lastModulePositions, Pose2d.kZero);
 
   private final SwerveSetpointGenerator setpointGenerator;
-  private SwerveSetpoint previousSetpoint;
+  private SwerveSetpoint currentSetpoint;
 
   public static final DriveTrainSimulationConfig driveTrainSimulationConfig =
       DriveTrainSimulationConfig.Default()
@@ -143,7 +143,7 @@ public class DriveSubsystem extends SubsystemBase {
         this::getPose,
         this::setPose,
         this::getChassisSpeeds,
-        this::runVelocity,
+        (speeds, feedforwards) -> runVelocity(speeds, feedforwards),
         new PPHolonomicDriveController(
             new PIDConstants(5.0, 0.0, 0.0), new PIDConstants(5.0, 0.0, 0.0)),
         PP_CONFIG,
@@ -159,7 +159,7 @@ public class DriveSubsystem extends SubsystemBase {
         (targetPose) -> Logger.recordOutput("PathPlanner/TargetPose", targetPose));
 
     setpointGenerator = new SwerveSetpointGenerator(PP_CONFIG, 10 * Math.PI);
-    previousSetpoint =
+    currentSetpoint =
         new SwerveSetpoint(getChassisSpeeds(), getModuleStates(), DriveFeedforwards.zeros(4));
 
     // Configure SysId
@@ -246,12 +246,12 @@ public class DriveSubsystem extends SubsystemBase {
    */
   public void runVelocity(ChassisSpeeds speeds) {
     // Calculate module setpoints
-    previousSetpoint = setpointGenerator.generateSetpoint(previousSetpoint, speeds, 0.02);
-    SwerveModuleState[] setpointStates = previousSetpoint.moduleStates();
+    currentSetpoint = setpointGenerator.generateSetpoint(currentSetpoint, speeds, 0.02);
+    SwerveModuleState[] setpointStates = currentSetpoint.moduleStates();
 
     // Log unoptimized setpoints and setpoint speeds
     Logger.recordOutput("Drive/States/Setpoints", setpointStates);
-    Logger.recordOutput("Drive/ChassisSpeeds/Setpoints", previousSetpoint.robotRelativeSpeeds());
+    Logger.recordOutput("Drive/ChassisSpeeds/Setpoints", currentSetpoint.robotRelativeSpeeds());
 
     // Send setpoints to modules
     for (int i = 0; i < 4; i++) {
@@ -260,6 +260,47 @@ public class DriveSubsystem extends SubsystemBase {
 
     // Log optimized setpoints (runSetpoint mutates each state)
     Logger.recordOutput("Drive/States/SetpointsOptimized", setpointStates);
+  }
+
+  /**
+   * Runs the drive at the desired velocity with setpoint module forces.
+   *
+   * @param speeds Speeds in meters/sec
+   * @param feedforwards The forces applied to each module
+   */
+  public void runVelocity(ChassisSpeeds speeds, DriveFeedforwards feedforwards) {
+    // Calculate module setpoints
+    SwerveModuleState[] setpointStatesUnoptimized = kinematics.toSwerveModuleStates(speeds);
+    currentSetpoint = setpointGenerator.generateSetpoint(currentSetpoint, speeds, 0.02);
+    SwerveModuleState[] setpointStates = currentSetpoint.moduleStates();
+
+    // Log unoptimized setpoints and setpoint speeds
+    Logger.recordOutput("Drive/States/SetpointsUnoptimized", setpointStatesUnoptimized);
+    Logger.recordOutput("Drive/States/Setpoints", setpointStates);
+    Logger.recordOutput("Drive/ChassisSpeeds/Setpoints", currentSetpoint.robotRelativeSpeeds());
+
+    // Save module forces to swerve states for logging
+    SwerveModuleState[] wheelForces = new SwerveModuleState[4];
+    // Send setpoints to modules
+    SwerveModuleState[] moduleStates = getModuleStates();
+    for (int i = 0; i < 4; i++) {
+      // Optimize state
+      Rotation2d wheelAngle = moduleStates[i].angle;
+      setpointStates[i].optimize(wheelAngle);
+      setpointStates[i].cosineScale(wheelAngle);
+
+      // Calculate wheel torque in direction
+      var wheelForce = feedforwards.linearForces()[i];
+      double wheelTorqueNm = wheelForce.in(Newtons) * TunerConstants.kWheelRadius.in(Meters);
+      modules[i].runSetpoint(setpointStates[i], wheelTorqueNm);
+
+      // Log optimized setpoints (runSetpoint mutates each state)
+      Logger.recordOutput("Drive/States/SetpointsOptimized", setpointStates);
+
+      // Save to array for logging
+      wheelForces[i] = new SwerveModuleState(wheelTorqueNm, setpointStates[i].angle);
+    }
+    Logger.recordOutput("Drive/States/ModuleForces", wheelForces);
   }
 
   /** Runs the drive in a straight line with the specified drive output. */
