@@ -14,6 +14,7 @@ import com.pathplanner.lib.util.swerve.SwerveSetpoint;
 import com.pathplanner.lib.util.swerve.SwerveSetpointGenerator;
 import edu.wpi.first.hal.FRCNetComm;
 import edu.wpi.first.hal.HAL;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.geometry.*;
@@ -24,7 +25,6 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.math.system.plant.DCMotor;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
@@ -96,6 +96,15 @@ public class DriveSubsystem extends SubsystemBase {
 
   @AutoLogOutput(key = "Drive/BrakeModeEnabled")
   private boolean brakeModeEnabled = true;
+
+  @AutoLogOutput(key = "Drive/IsTipping")
+  private boolean isTipping = false;
+
+  private ChassisSpeeds antiTipSpeeds = new ChassisSpeeds();
+  private static final LoggedTunableNumber tipKp =
+      new LoggedTunableNumber("Drive/AntiTip/TipKp", 0.03);
+  private static final LoggedTunableNumber tipThreshold =
+      new LoggedTunableNumber("Drive/AntiTip/TipThreshold", 3.0);
 
   private Rotation2d rawGyroRotation = Rotation2d.kZero;
   private final SwerveModulePosition[] lastModulePositions = // For delta tracking
@@ -267,7 +276,7 @@ public class DriveSubsystem extends SubsystemBase {
                     0.0,
                     0.0,
                     Math.abs(gyroInputs.pitchPosition.getRadians())
-                        * Units.inchesToMeters(24) // TODO: Don't make this hardcoded
+                        * driveTrainSimulationConfig.trackLengthX().in(Meters)
                         / 2.0,
                     0.0,
                     gyroInputs.pitchPosition.getRadians(),
@@ -276,10 +285,39 @@ public class DriveSubsystem extends SubsystemBase {
                 new Twist3d(
                     0.0,
                     0.0,
-                    Math.abs(gyroInputs.rollPosition.getRadians()) * Units.inchesToMeters(24) / 2.0,
+                    Math.abs(gyroInputs.rollPosition.getRadians())
+                        * driveTrainSimulationConfig.trackLengthX().in(Meters)
+                        / 2.0,
                     gyroInputs.rollPosition.getRadians(),
                     0.0,
                     0.0)));
+
+    // Calculate anti-tip control
+    isTipping =
+        Math.abs(gyroInputs.pitchPosition.getDegrees()) > tipThreshold.get()
+            || Math.abs(gyroInputs.rollPosition.getDegrees()) > tipThreshold.get();
+
+    // Tilt direction
+    Rotation2d tiltDirection =
+        new Rotation2d(
+            Math.atan2(
+                -gyroInputs.rollPosition.getDegrees(), -gyroInputs.pitchPosition.getDegrees()));
+
+    double correctionSpeed =
+        tipKp.get()
+            * -Math.hypot(
+                gyroInputs.pitchPosition.getDegrees(), gyroInputs.rollPosition.getDegrees());
+    correctionSpeed =
+        MathUtil.clamp(
+            correctionSpeed,
+            -TunerConstants.kSpeedAt12Volts.in(MetersPerSecond) / 2.0,
+            TunerConstants.kSpeedAt12Volts.in(MetersPerSecond) / 2.0);
+
+    // Correction vector (field-relative)
+    Translation2d correctionVector =
+        new Translation2d(0, 1).rotateBy(tiltDirection).times(correctionSpeed);
+
+    antiTipSpeeds = new ChassisSpeeds(correctionVector.getY(), correctionVector.getX(), 0);
 
     // Update brake mode
     // Reset movement timer if velocity above threshold
@@ -325,6 +363,9 @@ public class DriveSubsystem extends SubsystemBase {
    * @param speeds Speeds in meters/sec
    */
   public void runVelocity(ChassisSpeeds speeds) {
+    // Override input if we're tipping
+    if (isTipping) speeds = antiTipSpeeds;
+
     // Calculate module setpoints
     currentSetpoint = setpointGenerator.generateSetpoint(currentSetpoint, speeds, 0.02);
     SwerveModuleState[] setpointStates = currentSetpoint.moduleStates();
@@ -349,6 +390,9 @@ public class DriveSubsystem extends SubsystemBase {
    * @param feedforwards The forces applied to each module
    */
   public void runVelocity(ChassisSpeeds speeds, DriveFeedforwards feedforwards) {
+    // Override input if we're tipping
+    if (isTipping) speeds = antiTipSpeeds;
+
     // Calculate module setpoints
     SwerveModuleState[] setpointStatesUnoptimized = kinematics.toSwerveModuleStates(speeds);
     currentSetpoint = setpointGenerator.generateSetpoint(currentSetpoint, speeds, 0.02);
