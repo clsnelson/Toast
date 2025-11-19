@@ -7,7 +7,7 @@
       "height": 1034,
       "state": {
         "sidebar": {
-          "width": 285,
+          "width": 372,
           "expanded": [
             "/PathPlanner/currentPose/rotation",
             "/Pose",
@@ -61,10 +61,17 @@
             "/RealOutputs/Drive/TargetBranch",
             "/Pivot/PivotAbsolutePosition",
             "/Vision/limelight-front/PoseObservations",
-            "/RealOutputs/Drive/ChassisSpeeds",
-            "/RealOutputs/Drive/EstimatedPosition",
             "/SystemStats/CANBus",
-            "/NetworkInputs/SmartDashboard"
+            "/NetworkInputs/SmartDashboard",
+            "/RealOutputs/DriveSubsystem",
+            "/RealOutputs/Drive/ChassisSpeeds/Measured",
+            "/Tuning/Drive",
+            "/RealOutputs/LoggedTracer/Drive",
+            "/RealOutputs/RobotState",
+            "/Drive/ModuleBackLeft",
+            "/RealOutputs/Drive/States/Measured",
+            "/RealOutputs/Drive/States/Measured/0",
+            "/RealOutputs/test"
           ]
         },
         "tabs": {
@@ -85,19 +92,12 @@
                 "sources": [
                   {
                     "type": "robot",
-                    "logKey": "/RealOutputs/Drive/EstimatedPosition",
-                    "logType": "Pose2d",
+                    "logKey": "/RealOutputs/Drive/EstimatedPosition3d",
+                    "logType": "Pose3d",
                     "visible": true,
                     "options": {
                       "model": "Leviathan"
                     }
-                  },
-                  {
-                    "type": "component",
-                    "logKey": "/RealOutputs/Superstructure/Components",
-                    "logType": "Pose3d[]",
-                    "visible": true,
-                    "options": {}
                   },
                   {
                     "type": "swerveStates",
@@ -116,6 +116,16 @@
                     "visible": true,
                     "options": {
                       "color": "#0000ff",
+                      "arrangement": "0,1,2,3"
+                    }
+                  },
+                  {
+                    "type": "swerveStates",
+                    "logKey": "/RealOutputs/Drive/States/ModuleForces",
+                    "logType": "SwerveModuleState[]",
+                    "visible": true,
+                    "options": {
+                      "color": "#ff8c00",
                       "arrangement": "0,1,2,3"
                     }
                   },
@@ -140,13 +150,6 @@
                     }
                   },
                   {
-                    "type": "component",
-                    "logKey": "/RealOutputs/Superstructure/Components",
-                    "logType": "Pose3d[]",
-                    "visible": true,
-                    "options": {}
-                  },
-                  {
                     "type": "ghost",
                     "logKey": "/RealOutputs/Drive/TargetBranch",
                     "logType": "Pose2d",
@@ -167,13 +170,6 @@
                     }
                   },
                   {
-                    "type": "component",
-                    "logKey": "/RealOutputs/Superstructure/Components",
-                    "logType": "Pose3d[]",
-                    "visible": true,
-                    "options": {}
-                  },
-                  {
                     "type": "ghost",
                     "logKey": "/RealOutputs/Vision/RobotPosesRejected",
                     "logType": "Pose3d[]",
@@ -182,13 +178,6 @@
                       "model": "Leviathan",
                       "color": "#ff0000"
                     }
-                  },
-                  {
-                    "type": "component",
-                    "logKey": "/RealOutputs/Superstructure/Components",
-                    "logType": "Pose3d[]",
-                    "visible": true,
-                    "options": {}
                   },
                   {
                     "type": "aprilTag",
@@ -206,19 +195,19 @@
               "controllerUUID": "f9z2hljqspx3u7iqm05miq2nbzknu44h",
               "renderer": {
                 "cameraIndex": -1,
-                "orbitFov": 50,
+                "orbitFov": 90,
                 "cameraPosition": [
-                  -10.110995484944707,
-                  5.994682742391117,
-                  -0.6454655143419624
+                  3.6561951057457605,
+                  2.2018961050925903,
+                  4.864880049094892
                 ],
                 "cameraTarget": [
-                  -5.297190361084475,
-                  0.7239999997615736,
-                  -0.6404705363598558
+                  2.208091476843223,
+                  0.3495124999252219,
+                  2.4144746011656846
                 ]
               },
-              "controlsHeight": 200
+              "controlsHeight": 190
             },
             {
               "type": 2,
@@ -324,13 +313,6 @@
                     }
                   },
                   {
-                    "type": "component",
-                    "logKey": "/RealOutputs/Superstructure/Components",
-                    "logType": "Pose3d[]",
-                    "visible": true,
-                    "options": {}
-                  },
-                  {
                     "type": "gamePiece",
                     "logKey": "/RealOutputs/MapleSim/Coral",
                     "logType": "Pose3d[]",
@@ -357,14 +339,14 @@
                 "cameraIndex": -1,
                 "orbitFov": 50,
                 "cameraPosition": [
-                  -10.561861686652595,
-                  7.038055842211643,
-                  -0.4871841648186273
+                  11.09472752119678,
+                  7.919425172549771,
+                  0.22845113116650043
                 ],
                 "cameraTarget": [
-                  -7.644667911497611,
-                  3.8282990141311304,
-                  -0.27564732928507596
+                  4.499709223293159,
+                  0.35850000005214305,
+                  0.011722056420581214
                 ]
               },
               "controlsHeight": 200
@@ -418,6 +400,16 @@
                     "logType": "Rotation2d",
                     "visible": true,
                     "options": {}
+                  },
+                  {
+                    "type": "states",
+                    "logKey": "/RealOutputs/Drive/States/ModuleForces",
+                    "logType": "SwerveModuleState[]",
+                    "visible": true,
+                    "options": {
+                      "color": "#ff8c00",
+                      "arrangement": "0,1,2,3"
+                    }
                   }
                 ],
                 "maxSpeed": 5,
@@ -589,6 +581,18 @@
       }
     }
   ],
-  "satellites": [],
+  "satellites": [
+    {
+      "x": 1008,
+      "y": 131,
+      "width": 658,
+      "height": 682,
+      "state": {
+        "type": 9,
+        "visualizer": null
+      },
+      "uuid": "wf3ug9xlldsl8ht8nvov8m0cven0h4xz"
+    }
+  ],
   "version": "4.1.6"
 }
