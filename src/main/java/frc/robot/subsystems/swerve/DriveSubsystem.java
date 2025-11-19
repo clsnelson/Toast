@@ -16,10 +16,7 @@ import edu.wpi.first.hal.FRCNetComm;
 import edu.wpi.first.hal.HAL;
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Translation2d;
-import edu.wpi.first.math.geometry.Twist2d;
+import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
@@ -27,6 +24,7 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
@@ -259,6 +257,29 @@ public class DriveSubsystem extends SubsystemBase {
       // Apply update
       poseEstimator.updateWithTime(sampleTimestamps[i], rawGyroRotation, modulePositions);
     }
+
+    // Log 3D robot pose
+    Logger.recordOutput(
+        "Drive/EstimatedPosition3d",
+        new Pose3d(getPose())
+            .exp(
+                new Twist3d(
+                    0.0,
+                    0.0,
+                    Math.abs(gyroInputs.pitchPosition.getRadians())
+                        * Units.inchesToMeters(24) // TODO: Don't make this hardcoded
+                        / 2.0,
+                    0.0,
+                    gyroInputs.pitchPosition.getRadians(),
+                    0.0))
+            .exp(
+                new Twist3d(
+                    0.0,
+                    0.0,
+                    Math.abs(gyroInputs.rollPosition.getRadians()) * Units.inchesToMeters(24) / 2.0,
+                    gyroInputs.rollPosition.getRadians(),
+                    0.0,
+                    0.0)));
 
     // Update brake mode
     // Reset movement timer if velocity above threshold
