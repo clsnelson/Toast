@@ -11,8 +11,8 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.commands.DriveCommands;
-import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.drive.Drive;
+import frc.robot.subsystems.drive.DriveConstants;
 import frc.robot.subsystems.drive.gyro.GyroIO;
 import frc.robot.subsystems.drive.gyro.GyroIOPigeon2;
 import frc.robot.subsystems.drive.gyro.GyroIOSim;
@@ -47,10 +47,10 @@ public class RobotContainer {
         drivetrain =
             new Drive(
                 new GyroIOPigeon2(),
-                new ModuleIOTalonFX(TunerConstants.FrontLeft),
-                new ModuleIOTalonFX(TunerConstants.FrontRight),
-                new ModuleIOTalonFX(TunerConstants.BackLeft),
-                new ModuleIOTalonFX(TunerConstants.BackRight),
+                new ModuleIOTalonFX(DriveConstants.moduleConfigs[0]),
+                new ModuleIOTalonFX(DriveConstants.moduleConfigs[1]),
+                new ModuleIOTalonFX(DriveConstants.moduleConfigs[2]),
+                new ModuleIOTalonFX(DriveConstants.moduleConfigs[3]),
                 (robotPose) -> {});
         break;
 

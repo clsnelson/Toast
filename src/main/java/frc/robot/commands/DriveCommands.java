@@ -34,8 +34,9 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.ConditionalCommand;
 import frc.robot.Constants;
-import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.drive.Drive;
+import frc.robot.subsystems.drive.DriveConstants;
+import frc.robot.subsystems.drive.module.ModuleIOTalonFX;
 import frc.robot.util.LoggedTunableNumber;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
@@ -213,7 +214,8 @@ public class DriveCommands {
                           Math.max(
                               -1.5, Math.min(translationController.calculate(yError, 0.0), 1.5));
                       double velY =
-                          applyDeadband(clamped, drive.getMaxLinearSpeedMetersPerSec() * 0.01);
+                          applyDeadband(
+                              clamped, DriveConstants.maxLinearSpeedMetersPerSecond * 0.01);
 
                       Translation2d fieldRelativeVelocity =
                           new Translation2d(
@@ -310,9 +312,9 @@ public class DriveCommands {
     return ChassisSpeeds.fromRobotRelativeSpeeds(
         ChassisSpeeds.fromFieldRelativeSpeeds(
             new ChassisSpeeds(
-                linearVelocity.getX() * drive.getMaxLinearSpeedMetersPerSec(),
-                linearVelocity.getY() * drive.getMaxLinearSpeedMetersPerSec(),
-                omega * drive.getMaxAngularSpeedRadPerSec()),
+                linearVelocity.getX() * DriveConstants.maxLinearSpeedMetersPerSecond,
+                linearVelocity.getY() * DriveConstants.maxLinearSpeedMetersPerSecond,
+                omega * DriveConstants.maxAngularSpeedRadPerSec),
             drive.getPose().getRotation()),
         drive.getPose().getRotation().plus(skewCompensationFactor));
   }
@@ -352,8 +354,8 @@ public class DriveCommands {
               // Convert to field relative speeds & send command
               ChassisSpeeds speeds =
                   new ChassisSpeeds(
-                      linearVelocity.getX() * drive.getMaxLinearSpeedMetersPerSec(),
-                      linearVelocity.getY() * drive.getMaxLinearSpeedMetersPerSec(),
+                      linearVelocity.getX() * DriveConstants.maxLinearSpeedMetersPerSecond,
+                      linearVelocity.getY() * DriveConstants.maxLinearSpeedMetersPerSecond,
                       omega);
               boolean isFlipped =
                   DriverStation.getAlliance().isPresent()
@@ -434,7 +436,7 @@ public class DriveCommands {
                   throw new RuntimeException("Drive motor ClosedLoopOutputType must be Voltage.");
                 }),
             () ->
-                TunerConstants.kDriveClosedLoopOutput
+                ModuleIOTalonFX.driveClosedLoopOutput
                         == SwerveModuleConstants.ClosedLoopOutputType.Voltage
                     || RobotBase.isSimulation())
         .withName("Feedforward Characterization");
@@ -489,7 +491,7 @@ public class DriveCommands {
                             wheelDelta += Math.abs(positions[i] - state.positions[i]) / 4.0;
                           }
                           double wheelRadius =
-                              (state.gyroDelta * Drive.DRIVE_BASE_RADIUS) / wheelDelta;
+                              (state.gyroDelta * DriveConstants.driveBaseRadiusMeters) / wheelDelta;
 
                           NumberFormat formatter = new DecimalFormat("#0.000");
                           System.out.println(

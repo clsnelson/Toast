@@ -1,5 +1,6 @@
 package frc.robot.subsystems.drive.module;
 
+import static edu.wpi.first.units.Units.*;
 import static frc.robot.util.PhoenixUtil.tryUntilOk;
 
 import com.ctre.phoenix6.BaseStatusSignal;
@@ -14,12 +15,13 @@ import com.ctre.phoenix6.signals.FeedbackSensorSourceValue;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import com.ctre.phoenix6.signals.SensorDirectionValue;
-import com.ctre.phoenix6.swerve.SwerveModuleConstants;
+import com.ctre.phoenix6.swerve.SwerveModuleConstants.ClosedLoopOutputType;
+import com.ctre.phoenix6.swerve.SwerveModuleConstants.SteerFeedbackType;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.*;
-import frc.robot.generated.TunerConstants;
+import frc.robot.subsystems.drive.DriveConstants.ModuleConfig;
 import frc.robot.subsystems.drive.PhoenixOdometryThread;
 import java.util.Queue;
 import java.util.concurrent.Executor;
@@ -32,9 +34,16 @@ import java.util.concurrent.Executors;
  * <p>Device configuration and other behaviors not exposed by TunerConstants can be customized here.
  */
 public class ModuleIOTalonFX implements ModuleIO {
-  private final SwerveModuleConstants<
-          TalonFXConfiguration, TalonFXConfiguration, CANcoderConfiguration>
-      constants;
+  private static final ClosedLoopOutputType steerClosedLoopOutput = ClosedLoopOutputType.Voltage;
+  public static final ClosedLoopOutputType driveClosedLoopOutput = ClosedLoopOutputType.Voltage;
+
+  private static final SteerFeedbackType steerFeedbackType = SteerFeedbackType.FusedCANcoder;
+
+  public static final double driveRatio = 6.746031746031747;
+  public static final double steerRatio = 21.428571428571427;
+
+  public static final double driveStatorCurrentLimitAmps = 80.0;
+  private static final double steerStatorCurrentLimitAmps = 60.0;
 
   // Hardware objects
   private final TalonFX driveTalon;
@@ -86,60 +95,59 @@ public class ModuleIOTalonFX implements ModuleIO {
   private final Debouncer turnEncoderConnectedDebounce =
       new Debouncer(0.5, Debouncer.DebounceType.kFalling);
 
-  public ModuleIOTalonFX(
-      SwerveModuleConstants<TalonFXConfiguration, TalonFXConfiguration, CANcoderConfiguration>
-          constants) {
-    this.constants = constants;
-    driveTalon = new TalonFX(constants.DriveMotorId, TunerConstants.DrivetrainConstants.CANBusName);
-    turnTalon = new TalonFX(constants.SteerMotorId, TunerConstants.DrivetrainConstants.CANBusName);
-    cancoder = new CANcoder(constants.EncoderId, TunerConstants.DrivetrainConstants.CANBusName);
+  public ModuleIOTalonFX(ModuleConfig config) {
+    driveTalon = new TalonFX(config.driveMotorId(), "*");
+    turnTalon = new TalonFX(config.steerMotorId(), "*");
+    cancoder = new CANcoder(config.encoderId(), "*");
 
     // Configure drive motor
-    driveConfig = constants.DriveMotorInitialConfigs;
+    driveConfig = new TalonFXConfiguration();
     driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
-    driveConfig.Slot0 = constants.DriveMotorGains;
-    driveConfig.Feedback.SensorToMechanismRatio = constants.DriveMotorGearRatio;
-    driveConfig.TorqueCurrent.PeakForwardTorqueCurrent = constants.SlipCurrent;
-    driveConfig.TorqueCurrent.PeakReverseTorqueCurrent = -constants.SlipCurrent;
-    driveConfig.CurrentLimits.StatorCurrentLimit = constants.SlipCurrent;
+    driveConfig.Feedback.SensorToMechanismRatio = driveRatio;
+    driveConfig.TorqueCurrent.PeakForwardTorqueCurrent = driveStatorCurrentLimitAmps;
+    driveConfig.TorqueCurrent.PeakReverseTorqueCurrent = -driveStatorCurrentLimitAmps;
+    driveConfig.CurrentLimits.StatorCurrentLimit = driveStatorCurrentLimitAmps;
     driveConfig.CurrentLimits.StatorCurrentLimitEnable = true;
     driveConfig.MotorOutput.Inverted =
-        constants.DriveMotorInverted
+        config.isDriveInverted()
             ? InvertedValue.Clockwise_Positive
             : InvertedValue.CounterClockwise_Positive;
     tryUntilOk(5, () -> driveTalon.getConfigurator().apply(driveConfig, 0.25));
     tryUntilOk(5, () -> driveTalon.setPosition(0.0, 0.25));
 
     // Configure turn motor
-    turnConfig = constants.SteerMotorInitialConfigs;
+    turnConfig = new TalonFXConfiguration();
     turnConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
-    turnConfig.Slot0 = constants.SteerMotorGains;
-    turnConfig.Feedback.FeedbackRemoteSensorID = constants.EncoderId;
+    turnConfig.Feedback.FeedbackRemoteSensorID = config.encoderId();
     turnConfig.Feedback.FeedbackSensorSource =
-        switch (constants.FeedbackSource) {
+        switch (steerFeedbackType) {
           case RemoteCANcoder -> FeedbackSensorSourceValue.RemoteCANcoder;
           case FusedCANcoder -> FeedbackSensorSourceValue.FusedCANcoder;
           case SyncCANcoder -> FeedbackSensorSourceValue.SyncCANcoder;
           default -> throw new RuntimeException("FeedbackSource not supported.");
         };
-    turnConfig.Feedback.RotorToSensorRatio = constants.SteerMotorGearRatio;
-    turnConfig.MotionMagic.MotionMagicCruiseVelocity = 100.0 / constants.SteerMotorGearRatio;
-    turnConfig.MotionMagic.MotionMagicAcceleration =
-        turnConfig.MotionMagic.MotionMagicCruiseVelocity / 0.100;
-    turnConfig.MotionMagic.MotionMagicExpo_kV = 0.12 * constants.SteerMotorGearRatio;
-    turnConfig.MotionMagic.MotionMagicExpo_kA = 0.1;
+    turnConfig.Feedback.RotorToSensorRatio = steerRatio;
     turnConfig.ClosedLoopGeneral.ContinuousWrap = true;
+    turnConfig.TorqueCurrent.PeakForwardTorqueCurrent = steerStatorCurrentLimitAmps;
+    turnConfig.TorqueCurrent.PeakReverseTorqueCurrent = -steerStatorCurrentLimitAmps;
+    turnConfig.CurrentLimits.StatorCurrentLimit = steerStatorCurrentLimitAmps;
+    turnConfig.CurrentLimits.StatorCurrentLimitEnable = true;
     turnConfig.MotorOutput.Inverted =
-        constants.SteerMotorInverted
+        config.isSteerInverted()
             ? InvertedValue.Clockwise_Positive
             : InvertedValue.CounterClockwise_Positive;
+    turnConfig.MotionMagic.MotionMagicCruiseVelocity = 100.0 / steerRatio;
+    turnConfig.MotionMagic.MotionMagicAcceleration =
+        turnConfig.MotionMagic.MotionMagicCruiseVelocity / 0.100;
+    turnConfig.MotionMagic.MotionMagicExpo_kV = 0.12 * steerRatio;
+    turnConfig.MotionMagic.MotionMagicExpo_kA = 0.1;
     tryUntilOk(5, () -> turnTalon.getConfigurator().apply(turnConfig, 0.25));
 
     // Configure CANCoder
-    CANcoderConfiguration cancoderConfig = constants.EncoderInitialConfigs;
-    cancoderConfig.MagnetSensor.MagnetOffset = constants.EncoderOffset;
+    CANcoderConfiguration cancoderConfig = new CANcoderConfiguration();
+    cancoderConfig.MagnetSensor.MagnetOffset = config.encoderOffset().in(Rotations);
     cancoderConfig.MagnetSensor.SensorDirection =
-        constants.EncoderInverted
+        config.isEncoderInverted()
             ? SensorDirectionValue.Clockwise_Positive
             : SensorDirectionValue.CounterClockwise_Positive;
     tryUntilOk(5, () -> cancoder.getConfigurator().apply(cancoderConfig, 0.25));
@@ -222,7 +230,7 @@ public class ModuleIOTalonFX implements ModuleIO {
   @Override
   public void setDriveOpenLoop(double output) {
     driveTalon.setControl(
-        switch (constants.DriveMotorClosedLoopOutput) {
+        switch (driveClosedLoopOutput) {
           case Voltage -> voltageRequest.withOutput(output);
           case TorqueCurrentFOC -> torqueCurrentRequest.withOutput(output);
         });
@@ -231,7 +239,7 @@ public class ModuleIOTalonFX implements ModuleIO {
   @Override
   public void setTurnOpenLoop(double output) {
     turnTalon.setControl(
-        switch (constants.SteerMotorClosedLoopOutput) {
+        switch (steerClosedLoopOutput) {
           case Voltage -> voltageRequest.withOutput(output);
           case TorqueCurrentFOC -> torqueCurrentRequest.withOutput(output);
         });
@@ -241,7 +249,7 @@ public class ModuleIOTalonFX implements ModuleIO {
   public void setDriveVelocity(double velocityRadPerSec, double feedforward) {
     double velocityRotPerSec = Units.radiansToRotations(velocityRadPerSec);
     driveTalon.setControl(
-        switch (constants.DriveMotorClosedLoopOutput) {
+        switch (driveClosedLoopOutput) {
           case Voltage ->
               velocityVoltageRequest.withVelocity(velocityRotPerSec).withFeedForward(feedforward);
           case TorqueCurrentFOC ->
@@ -254,7 +262,7 @@ public class ModuleIOTalonFX implements ModuleIO {
   @Override
   public void setTurnPosition(Rotation2d rotation) {
     turnTalon.setControl(
-        switch (constants.SteerMotorClosedLoopOutput) {
+        switch (steerClosedLoopOutput) {
           case Voltage -> positionVoltageRequest.withPosition(rotation.getRotations());
           case TorqueCurrentFOC ->
               positionTorqueCurrentRequest.withPosition(rotation.getRotations());

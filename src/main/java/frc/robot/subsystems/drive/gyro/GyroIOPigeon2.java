@@ -13,6 +13,8 @@
 
 package frc.robot.subsystems.drive.gyro;
 
+import static frc.robot.util.PhoenixUtil.tryUntilOk;
+
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusCode;
 import com.ctre.phoenix6.StatusSignal;
@@ -22,17 +24,13 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
-import frc.robot.generated.TunerConstants;
+import frc.robot.subsystems.drive.DriveConstants;
 import frc.robot.subsystems.drive.PhoenixOdometryThread;
-import java.util.Objects;
 import java.util.Queue;
 
 /** IO implementation for Pigeon 2. */
 public class GyroIOPigeon2 implements GyroIO {
-  private final Pigeon2 pigeon =
-      new Pigeon2(
-          TunerConstants.DrivetrainConstants.Pigeon2Id,
-          TunerConstants.DrivetrainConstants.CANBusName);
+  private final Pigeon2 pigeon = new Pigeon2(DriveConstants.PigeonConstants.id, "*");
   private final StatusSignal<Angle> yaw = pigeon.getYaw();
   private final Queue<Double> yawPositionQueue;
   private final Queue<Double> yawTimestampQueue;
@@ -43,19 +41,15 @@ public class GyroIOPigeon2 implements GyroIO {
   private final StatusSignal<AngularVelocity> rollVelocity = pigeon.getAngularVelocityYWorld();
 
   public GyroIOPigeon2() {
-    pigeon
-        .getConfigurator()
-        .apply(
-            Objects.requireNonNullElseGet(
-                TunerConstants.DrivetrainConstants.Pigeon2Configs, Pigeon2Configuration::new));
-
+    pigeon.getConfigurator().apply(new Pigeon2Configuration());
     pigeon.getConfigurator().setYaw(0.0);
-    yaw.setUpdateFrequency(250);
+    yaw.setUpdateFrequency(DriveConstants.odomFrequency);
     BaseStatusSignal.setUpdateFrequencyForAll(
         50.0, pitch, roll, yawVelocity, pitchVelocity, rollVelocity);
     pigeon.optimizeBusUtilization();
     yawTimestampQueue = PhoenixOdometryThread.getInstance().makeTimestampQueue();
     yawPositionQueue = PhoenixOdometryThread.getInstance().registerSignal(yaw.clone());
+    tryUntilOk(5, () -> pigeon.setYaw(0.0, 0.25));
   }
 
   @Override

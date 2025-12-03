@@ -31,11 +31,11 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
-import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.drive.gyro.GyroIO;
 import frc.robot.subsystems.drive.gyro.GyroIOInputsAutoLogged;
 import frc.robot.subsystems.drive.module.Module;
 import frc.robot.subsystems.drive.module.ModuleIO;
+import frc.robot.subsystems.drive.module.ModuleIOTalonFX;
 import frc.robot.util.LocalADStarAK;
 import frc.robot.util.LoggedTracer;
 import frc.robot.util.LoggedTunableNumber;
@@ -49,14 +49,6 @@ import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 public class Drive extends SubsystemBase {
-  public static final double DRIVE_BASE_RADIUS =
-      Math.max(
-          Math.max(
-              Math.hypot(TunerConstants.FrontLeft.LocationX, TunerConstants.FrontLeft.LocationY),
-              Math.hypot(TunerConstants.FrontRight.LocationX, TunerConstants.FrontRight.LocationY)),
-          Math.max(
-              Math.hypot(TunerConstants.BackLeft.LocationX, TunerConstants.BackLeft.LocationY),
-              Math.hypot(TunerConstants.BackRight.LocationX, TunerConstants.BackRight.LocationY)));
 
   // PathPlanner config constants
   private static final double ROBOT_MASS_KG = 74.088;
@@ -67,12 +59,11 @@ public class Drive extends SubsystemBase {
           ROBOT_MASS_KG,
           ROBOT_MOI,
           new ModuleConfig(
-              TunerConstants.FrontLeft.WheelRadius,
-              TunerConstants.kSpeedAt12Volts.in(MetersPerSecond),
+              DriveConstants.wheelRadius,
+              MetersPerSecond.of(DriveConstants.maxLinearSpeedMetersPerSecond),
               WHEEL_COF,
-              DCMotor.getKrakenX60Foc(1)
-                  .withReduction(TunerConstants.FrontLeft.DriveMotorGearRatio),
-              TunerConstants.FrontLeft.SlipCurrent,
+              DCMotor.getKrakenX60Foc(1).withReduction(ModuleIOTalonFX.driveRatio),
+              Amps.of(ModuleIOTalonFX.driveStatorCurrentLimitAmps),
               1),
           getModuleTranslations());
 
@@ -143,10 +134,10 @@ public class Drive extends SubsystemBase {
       ModuleIO brModuleIO,
       Consumer<Pose2d> resetSimulationPoseCallback) {
     this.gyroIO = gyroIO;
-    modules[0] = new Module(flModuleIO, "FrontLeft", TunerConstants.FrontLeft);
-    modules[1] = new Module(frModuleIO, "FrontRight", TunerConstants.FrontRight);
-    modules[2] = new Module(blModuleIO, "BackLeft", TunerConstants.BackLeft);
-    modules[3] = new Module(brModuleIO, "BackRight", TunerConstants.BackRight);
+    modules[0] = new Module(flModuleIO, "FrontLeft");
+    modules[1] = new Module(frModuleIO, "FrontRight");
+    modules[2] = new Module(blModuleIO, "BackLeft");
+    modules[3] = new Module(brModuleIO, "BackRight");
     this.resetSimulationPoseCallback = resetSimulationPoseCallback;
 
     lastMovementTimer.start();
@@ -158,7 +149,6 @@ public class Drive extends SubsystemBase {
         FRCNetComm.tInstances.kRobotDriveSwerve_AdvantageKit);
 
     // Start odometry thread
-    PhoenixOdometryThread.setCANFD(TunerConstants.kCANBus.isNetworkFD());
     PhoenixOdometryThread.getInstance().start();
 
     // Configure AutoBuilder for PathPlanner
@@ -276,7 +266,7 @@ public class Drive extends SubsystemBase {
                     0.0,
                     0.0,
                     Math.abs(gyroInputs.pitchPosition.getRadians())
-                        * driveTrainSimulationConfig.trackLengthX().in(Meters)
+                        * DriveConstants.trackWidthMeters
                         / 2.0,
                     0.0,
                     gyroInputs.pitchPosition.getRadians(),
@@ -286,7 +276,7 @@ public class Drive extends SubsystemBase {
                     0.0,
                     0.0,
                     Math.abs(gyroInputs.rollPosition.getRadians())
-                        * driveTrainSimulationConfig.trackLengthX().in(Meters)
+                        * DriveConstants.trackWidthMeters
                         / 2.0,
                     gyroInputs.rollPosition.getRadians(),
                     0.0,
@@ -310,8 +300,8 @@ public class Drive extends SubsystemBase {
     correctionSpeed =
         MathUtil.clamp(
             correctionSpeed,
-            -TunerConstants.kSpeedAt12Volts.in(MetersPerSecond) / 2.0,
-            TunerConstants.kSpeedAt12Volts.in(MetersPerSecond) / 2.0);
+            -DriveConstants.maxLinearSpeedMetersPerSecond / 2.0,
+            DriveConstants.maxLinearSpeedMetersPerSecond / 2.0);
 
     // Correction vector (field-relative)
     Translation2d correctionVector =
@@ -415,7 +405,7 @@ public class Drive extends SubsystemBase {
 
       // Calculate wheel torque in direction
       var wheelForce = feedforwards.linearForces()[i];
-      double wheelTorqueNm = wheelForce.in(Newtons) * TunerConstants.kWheelRadius.in(Meters);
+      double wheelTorqueNm = wheelForce.in(Newtons) * DriveConstants.wheelRadius.in(Meters);
       modules[i].runSetpoint(setpointStates[i], wheelTorqueNm);
 
       // Log optimized setpoints (runSetpoint mutates each state)
@@ -533,23 +523,13 @@ public class Drive extends SubsystemBase {
         visionRobotPoseMeters, timestampSeconds, visionMeasurementStdDevs);
   }
 
-  /** Returns the maximum linear speed in meters per sec. */
-  public double getMaxLinearSpeedMetersPerSec() {
-    return TunerConstants.kSpeedAt12Volts.in(MetersPerSecond);
-  }
-
-  /** Returns the maximum angular speed in radians per sec. */
-  public double getMaxAngularSpeedRadPerSec() {
-    return getMaxLinearSpeedMetersPerSec() / DRIVE_BASE_RADIUS;
-  }
-
   /** Returns an array of module translations. */
   public static Translation2d[] getModuleTranslations() {
     return new Translation2d[] {
-      new Translation2d(TunerConstants.FrontLeft.LocationX, TunerConstants.FrontLeft.LocationY),
-      new Translation2d(TunerConstants.FrontRight.LocationX, TunerConstants.FrontRight.LocationY),
-      new Translation2d(TunerConstants.BackLeft.LocationX, TunerConstants.BackLeft.LocationY),
-      new Translation2d(TunerConstants.BackRight.LocationX, TunerConstants.BackRight.LocationY)
+      new Translation2d(DriveConstants.trackWidthMeters / 2, DriveConstants.trackWidthMeters / 2),
+      new Translation2d(DriveConstants.trackWidthMeters / 2, -DriveConstants.trackWidthMeters / 2),
+      new Translation2d(-DriveConstants.trackWidthMeters / 2, DriveConstants.trackWidthMeters / 2),
+      new Translation2d(-DriveConstants.trackWidthMeters / 2, -DriveConstants.trackWidthMeters / 2)
     };
   }
 }
