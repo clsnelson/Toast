@@ -1,4 +1,4 @@
-package frc.robot.subsystems.swerve.module;
+package frc.robot.subsystems.drive.module;
 
 import static frc.robot.util.PhoenixUtil.tryUntilOk;
 
@@ -20,7 +20,7 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.*;
 import frc.robot.generated.TunerConstants;
-import frc.robot.subsystems.swerve.PhoenixOdometryThread;
+import frc.robot.subsystems.drive.PhoenixOdometryThread;
 import java.util.Queue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;

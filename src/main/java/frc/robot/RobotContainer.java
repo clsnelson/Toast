@@ -12,13 +12,13 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.commands.DriveCommands;
 import frc.robot.generated.TunerConstants;
-import frc.robot.subsystems.swerve.DriveSubsystem;
-import frc.robot.subsystems.swerve.gyro.GyroIO;
-import frc.robot.subsystems.swerve.gyro.GyroIOPigeon2;
-import frc.robot.subsystems.swerve.gyro.GyroIOSim;
-import frc.robot.subsystems.swerve.module.ModuleIO;
-import frc.robot.subsystems.swerve.module.ModuleIOSim;
-import frc.robot.subsystems.swerve.module.ModuleIOTalonFX;
+import frc.robot.subsystems.drive.Drive;
+import frc.robot.subsystems.drive.gyro.GyroIO;
+import frc.robot.subsystems.drive.gyro.GyroIOPigeon2;
+import frc.robot.subsystems.drive.gyro.GyroIOSim;
+import frc.robot.subsystems.drive.module.ModuleIO;
+import frc.robot.subsystems.drive.module.ModuleIOSim;
+import frc.robot.subsystems.drive.module.ModuleIOTalonFX;
 import java.io.File;
 import java.util.Objects;
 import org.ironmaple.simulation.SimulatedArena;
@@ -30,7 +30,7 @@ public class RobotContainer {
   private final CommandXboxController driver = new CommandXboxController(0);
 
   // Subsystems
-  private final DriveSubsystem drivetrain;
+  private final Drive drivetrain;
 
   // Elastic auto chooser
   private LoggedDashboardChooser<Command> autoChooser;
@@ -38,14 +38,14 @@ public class RobotContainer {
   // MapleSim configuration (start on the field)
   public static SwerveDriveSimulation swerveDriveSimulation =
       new SwerveDriveSimulation(
-          DriveSubsystem.driveTrainSimulationConfig, new Pose2d(3, 3, Rotation2d.kZero));
+          Drive.driveTrainSimulationConfig, new Pose2d(3, 3, Rotation2d.kZero));
 
   public RobotContainer() {
     switch (Constants.currentMode) {
       case REAL:
         // Real robot, instantiate hardware IO implementations
         drivetrain =
-            new DriveSubsystem(
+            new Drive(
                 new GyroIOPigeon2(),
                 new ModuleIOTalonFX(TunerConstants.FrontLeft),
                 new ModuleIOTalonFX(TunerConstants.FrontRight),
@@ -57,7 +57,7 @@ public class RobotContainer {
       case SIM:
         // Sim robot, instantiate physics sim IO implementations
         drivetrain =
-            new DriveSubsystem(
+            new Drive(
                 new GyroIOSim(swerveDriveSimulation.getGyroSimulation()),
                 new ModuleIOSim(swerveDriveSimulation.getModules()[0]),
                 new ModuleIOSim(swerveDriveSimulation.getModules()[1]),
@@ -70,7 +70,7 @@ public class RobotContainer {
       default:
         // Replayed robot, disable IO implementations
         drivetrain =
-            new DriveSubsystem(
+            new Drive(
                 new GyroIO() {},
                 new ModuleIO() {},
                 new ModuleIO() {},

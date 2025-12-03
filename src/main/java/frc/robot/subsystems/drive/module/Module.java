@@ -1,4 +1,4 @@
-package frc.robot.subsystems.swerve.module;
+package frc.robot.subsystems.drive.module;
 
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
