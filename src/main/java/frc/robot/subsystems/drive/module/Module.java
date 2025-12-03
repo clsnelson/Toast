@@ -21,7 +21,7 @@ public class Module {
   private static final LoggedTunableNumber drivekV =
       new LoggedTunableNumber("Drive/Module/DrivekV");
   private static final LoggedTunableNumber drivekT =
-      new LoggedTunableNumber("Drive/Module/DrivekT");
+      new LoggedTunableNumber("Drive/Module/DrivekT", TunerConstants.kDriveGearRatio / DCMotor.getKrakenX60Foc(1).KtNMPerAmp);
   private static final LoggedTunableNumber drivekP =
       new LoggedTunableNumber("Drive/Module/DrivekP");
   private static final LoggedTunableNumber drivekD =
@@ -35,8 +35,6 @@ public class Module {
       var driveGains = TunerConstants.driveGains;
       drivekS.initDefault(driveGains.kS);
       drivekV.initDefault(driveGains.kV);
-      // Multiplied by desired wheelTorqueNm
-      drivekT.initDefault(TunerConstants.kDriveGearRatio / DCMotor.getKrakenX60Foc(1).KtNMPerAmp);
       drivekP.initDefault(driveGains.kP);
       drivekD.initDefault(driveGains.kD);
 
@@ -45,9 +43,8 @@ public class Module {
       turnkD.initDefault(turnGains.kD);
     } else {
       // Simulating, use simulated constants
-      drivekS.initDefault(0.014);
-      drivekV.initDefault(0.134);
-      drivekT.initDefault(0);
+      drivekS.initDefault(0.03);
+      drivekV.initDefault(1.0 / Units.rotationsToRadians(1.0 / 0.91035));
       drivekP.initDefault(0.1);
       drivekD.initDefault(0);
       turnkP.initDefault(10.0);
