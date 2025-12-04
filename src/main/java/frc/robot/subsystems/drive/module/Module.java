@@ -2,10 +2,12 @@ package frc.robot.subsystems.drive.module;
 
 import static edu.wpi.first.units.Units.Meters;
 
+import com.ctre.phoenix6.swerve.SwerveModuleConstants;
 import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Alert;
 import frc.robot.Constants;
@@ -20,7 +22,9 @@ public class Module {
   private static final LoggedTunableNumber drivekV =
       new LoggedTunableNumber("Drive/Module/DrivekV");
   private static final LoggedTunableNumber drivekT =
-      new LoggedTunableNumber("Drive/Module/DrivekT", 0); // TODO: Investigate kT issues... yay...
+      new LoggedTunableNumber(
+          "Drive/Module/DrivekT",
+          ModuleIOTalonFX.driveRatio / DCMotor.getKrakenX60Foc(1).KtNMPerAmp);
   private static final LoggedTunableNumber drivekP =
       new LoggedTunableNumber("Drive/Module/DrivekP");
   private static final LoggedTunableNumber drivekD =
@@ -108,29 +112,34 @@ public class Module {
     turnEncoderDisconnectedAlert.set(!inputs.turnEncoderConnected);
   }
 
-  /** Runs the module with the specified setpoint state. */
-  public void runSetpoint(SwerveModuleState state) {
+  /**
+   * Runs the module with the specified setpoint state and a setpoint wheel force used for
+   * torque-based feedforward.
+   */
+  public void runSetpointWithFeedforward(SwerveModuleState state, double wheelTorqueNm) {
+    if (ModuleIOTalonFX.driveClosedLoopOutput
+        == SwerveModuleConstants.ClosedLoopOutputType.Voltage) {
+      runSetpoint(state);
+      return;
+    }
+
     // Apply setpoints
     double speedRadPerSec = state.speedMetersPerSecond / DriveConstants.wheelRadius.in(Meters);
-    io.setDriveVelocity(speedRadPerSec, ffModel.calculate(speedRadPerSec));
+    io.setDriveVelocity(
+        speedRadPerSec, ffModel.calculate(speedRadPerSec) + wheelTorqueNm * drivekT.get());
 
     // Prevent wheel turning from messing with alignment
-    if (Math.abs(state.angle.minus(getAngle()).getDegrees()) < 0.3) {
+    if (Math.abs(state.angle.minus(getAngle()).getDegrees()) < DriveConstants.turnDeadbandDegrees) {
       io.setTurnOpenLoop(0.0);
     } else {
       io.setTurnPosition(state.angle);
     }
   }
 
-  /**
-   * Runs the module with the specified setpoint state and a setpoint wheel force used for
-   * torque-based feedforward.
-   */
-  public void runSetpoint(SwerveModuleState state, double wheelTorqueNm) {
-    // Apply setpoints
+  /** Runs the module with the specified setpoint state. */
+  public void runSetpoint(SwerveModuleState state) {
     double speedRadPerSec = state.speedMetersPerSecond / DriveConstants.wheelRadius.in(Meters);
-    io.setDriveVelocity(
-        speedRadPerSec, ffModel.calculate(speedRadPerSec) + wheelTorqueNm * drivekT.get());
+    io.setDriveVelocity(speedRadPerSec, ffModel.calculate(speedRadPerSec));
 
     // Prevent wheel turning from messing with alignment
     if (Math.abs(state.angle.minus(getAngle()).getDegrees()) < DriveConstants.turnDeadbandDegrees) {

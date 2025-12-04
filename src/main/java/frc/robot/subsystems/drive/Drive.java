@@ -406,7 +406,7 @@ public class Drive extends SubsystemBase {
       // Calculate wheel torque in direction
       var wheelForce = feedforwards.linearForces()[i];
       double wheelTorqueNm = wheelForce.in(Newtons) * DriveConstants.wheelRadius.in(Meters);
-      modules[i].runSetpoint(setpointStates[i], wheelTorqueNm);
+      modules[i].runSetpointWithFeedforward(setpointStates[i], wheelTorqueNm);
 
       // Log optimized setpoints (runSetpoint mutates each state)
       Logger.recordOutput("Drive/States/SetpointsOptimized", setpointStates);
