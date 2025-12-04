@@ -29,9 +29,7 @@ import java.util.concurrent.Executors;
 
 /**
  * Module IO implementation for Talon FX drive motor controller, Talon FX turn motor controller, and
- * CANcoder. Configured using a set of module constants from Phoenix.
- *
- * <p>Device configuration and other behaviors not exposed by TunerConstants can be customized here.
+ * CANcoder.
  */
 public class ModuleIOTalonFX implements ModuleIO {
   private static final ClosedLoopOutputType steerClosedLoopOutput = ClosedLoopOutputType.Voltage;
