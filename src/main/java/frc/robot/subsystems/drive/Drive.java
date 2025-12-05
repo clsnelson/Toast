@@ -1,11 +1,10 @@
 package frc.robot.subsystems.drive;
 
 import static edu.wpi.first.units.Units.*;
+import static frc.robot.subsystems.drive.DriveConstants.*;
 
 import com.pathplanner.lib.auto.AutoBuilder;
-import com.pathplanner.lib.config.ModuleConfig;
 import com.pathplanner.lib.config.PIDConstants;
-import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 import com.pathplanner.lib.pathfinding.Pathfinding;
 import com.pathplanner.lib.util.DriveFeedforwards;
@@ -24,7 +23,6 @@ import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
-import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
@@ -35,7 +33,6 @@ import frc.robot.subsystems.drive.gyro.GyroIO;
 import frc.robot.subsystems.drive.gyro.GyroIOInputsAutoLogged;
 import frc.robot.subsystems.drive.module.Module;
 import frc.robot.subsystems.drive.module.ModuleIO;
-import frc.robot.subsystems.drive.module.ModuleIOTalonFX;
 import frc.robot.util.LocalADStarAK;
 import frc.robot.util.LoggedTracer;
 import frc.robot.util.LoggedTunableNumber;
@@ -43,30 +40,10 @@ import java.util.Arrays;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
-import org.ironmaple.simulation.drivesims.COTS;
-import org.ironmaple.simulation.drivesims.configs.DriveTrainSimulationConfig;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 public class Drive extends SubsystemBase {
-
-  // PathPlanner config constants
-  private static final double ROBOT_MASS_KG = 74.088;
-  private static final double ROBOT_MOI = 6.883;
-  private static final double WHEEL_COF = 1.2;
-  private static final RobotConfig PP_CONFIG =
-      new RobotConfig(
-          ROBOT_MASS_KG,
-          ROBOT_MOI,
-          new ModuleConfig(
-              DriveConstants.wheelRadius,
-              MetersPerSecond.of(DriveConstants.maxLinearSpeedMetersPerSecond),
-              WHEEL_COF,
-              DCMotor.getKrakenX60Foc(1).withReduction(ModuleIOTalonFX.driveRatio),
-              Amps.of(ModuleIOTalonFX.driveStatorCurrentLimitAmps),
-              1),
-          getModuleTranslations());
-
   static final Lock odometryLock = new ReentrantLock();
   private final GyroIO gyroIO;
   private final GyroIOInputsAutoLogged gyroInputs = new GyroIOInputsAutoLogged();
@@ -110,19 +87,6 @@ public class Drive extends SubsystemBase {
 
   private final SwerveSetpointGenerator setpointGenerator;
   private SwerveSetpoint currentSetpoint;
-
-  public static final DriveTrainSimulationConfig driveTrainSimulationConfig =
-      DriveTrainSimulationConfig.Default()
-          .withGyro(COTS.ofPigeon2())
-          .withSwerveModule(
-              COTS.ofMark4i(
-                  DCMotor.getKrakenX60Foc(1),
-                  DCMotor.getKrakenX60Foc(1),
-                  COTS.WHEELS.DEFAULT_NEOPRENE_TREAD.cof,
-                  2)) // L2 Gear ratio
-          .withTrackLengthTrackWidth(Inches.of(24), Inches.of(24))
-          .withBumperSize(Inches.of(37), Inches.of(37))
-          .withRobotMass(Kilogram.of(ROBOT_MASS_KG));
 
   private final Consumer<Pose2d> resetSimulationPoseCallback;
 

@@ -38,7 +38,7 @@ public class RobotContainer {
   // MapleSim configuration (start on the field)
   public static SwerveDriveSimulation swerveDriveSimulation =
       new SwerveDriveSimulation(
-          Drive.driveTrainSimulationConfig, new Pose2d(3, 3, Rotation2d.kZero));
+          DriveConstants.driveTrainSimulationConfig, new Pose2d(3, 3, Rotation2d.kZero));
 
   public RobotContainer() {
     switch (Constants.currentMode) {

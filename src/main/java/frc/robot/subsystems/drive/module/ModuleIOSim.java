@@ -10,9 +10,7 @@ import java.util.Arrays;
 import org.ironmaple.simulation.drivesims.SwerveModuleSimulation;
 import org.ironmaple.simulation.motorsims.SimulatedMotorController;
 
-/**
- * Physics sim implementation of module IO. Voltage control based.
- */
+/** Physics sim implementation of module IO. Voltage control based. */
 public class ModuleIOSim implements ModuleIO {
   // TunerConstants doesn't support separate sim constants, so they are declared locally
   private static final double DRIVE_KS = 0.03;

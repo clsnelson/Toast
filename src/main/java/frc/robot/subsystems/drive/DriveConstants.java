@@ -2,11 +2,16 @@ package frc.robot.subsystems.drive;
 
 import static edu.wpi.first.units.Units.*;
 
+import com.pathplanner.lib.config.RobotConfig;
+import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.units.measure.Frequency;
+import frc.robot.subsystems.drive.module.ModuleIOTalonFX;
 import lombok.Builder;
+import org.ironmaple.simulation.drivesims.COTS;
+import org.ironmaple.simulation.drivesims.configs.DriveTrainSimulationConfig;
 
 public class DriveConstants {
   public static final Frequency odomFrequency = Hertz.of(250);
@@ -20,6 +25,37 @@ public class DriveConstants {
   public static final double turnDeadbandDegrees = 0.3;
 
   public static final Distance wheelRadius = Inches.of(2.0);
+
+  // PathPlanner config constants
+  public static final double ROBOT_MASS_KG = 74.088;
+  public static final double ROBOT_MOI = 6.883;
+  public static final double WHEEL_COF = 1.2;
+  public static final RobotConfig PP_CONFIG =
+      new RobotConfig(
+          ROBOT_MASS_KG,
+          ROBOT_MOI,
+          new com.pathplanner.lib.config.ModuleConfig(
+              DriveConstants.wheelRadius,
+              MetersPerSecond.of(DriveConstants.maxLinearSpeedMetersPerSecond),
+              WHEEL_COF,
+              DCMotor.getKrakenX60Foc(1).withReduction(ModuleIOTalonFX.driveRatio),
+              Amps.of(ModuleIOTalonFX.driveStatorCurrentLimitAmps),
+              1),
+          Drive.getModuleTranslations());
+
+  // MapleSim config
+  public static final DriveTrainSimulationConfig driveTrainSimulationConfig =
+      DriveTrainSimulationConfig.Default()
+          .withGyro(COTS.ofPigeon2())
+          .withSwerveModule(
+              COTS.ofMark4i(
+                  DCMotor.getKrakenX60Foc(1),
+                  DCMotor.getKrakenX60Foc(1),
+                  COTS.WHEELS.DEFAULT_NEOPRENE_TREAD.cof,
+                  2)) // L2 Gear ratio
+          .withTrackLengthTrackWidth(Inches.of(trackWidthMeters), Inches.of(trackWidthMeters))
+          .withBumperSize(Inches.of(37), Inches.of(37))
+          .withRobotMass(Kilogram.of(ROBOT_MASS_KG));
 
   public static final ModuleConfig[] moduleConfigs = {
     // Front Left
