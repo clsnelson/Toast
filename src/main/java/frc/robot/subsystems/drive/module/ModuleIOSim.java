@@ -20,27 +20,27 @@ public class ModuleIOSim implements ModuleIO {
 
   private final SwerveModuleSimulation moduleSimulation;
   private final SimulatedMotorController.GenericMotorController driveMotor;
-  private final SimulatedMotorController.GenericMotorController turnMotor;
+  private final SimulatedMotorController.GenericMotorController steerMotor;
 
   private boolean driveClosedLoop = false;
-  private boolean turnClosedLoop = false;
+  private boolean steerClosedLoop = false;
   private final PIDController driveController;
-  private final PIDController turnController;
+  private final PIDController steerController;
   private double driveFFVolts = 0.0;
   private double driveAppliedVolts = 0.0;
-  private double turnAppliedVolts = 0.0;
+  private double steerAppliedVolts = 0.0;
 
   public ModuleIOSim(SwerveModuleSimulation moduleSimulation) {
     this.moduleSimulation = moduleSimulation;
     this.driveMotor =
         moduleSimulation.useGenericMotorControllerForDrive().withCurrentLimit(Amps.of(80.0));
-    this.turnMotor = moduleSimulation.useGenericControllerForSteer().withCurrentLimit(Amps.of(60));
+    this.steerMotor = moduleSimulation.useGenericControllerForSteer().withCurrentLimit(Amps.of(60));
 
     this.driveController = new PIDController(0.05, 0.0, 0.0);
-    this.turnController = new PIDController(8.0, 0.0, 0.0);
+    this.steerController = new PIDController(8.0, 0.0, 0.0);
 
-    // Enable wrapping for turn PID
-    turnController.enableContinuousInput(-Math.PI, Math.PI);
+    // Enable wrapping for steer PID
+    steerController.enableContinuousInput(-Math.PI, Math.PI);
   }
 
   @Override
@@ -54,16 +54,16 @@ public class ModuleIOSim implements ModuleIO {
     } else {
       driveController.reset();
     }
-    if (turnClosedLoop) {
-      turnAppliedVolts =
-          turnController.calculate(moduleSimulation.getSteerAbsoluteFacing().getRadians());
+    if (steerClosedLoop) {
+      steerAppliedVolts =
+          steerController.calculate(moduleSimulation.getSteerAbsoluteFacing().getRadians());
     } else {
-      turnController.reset();
+      steerController.reset();
     }
 
     // Update simulation state
     driveMotor.requestVoltage(Volts.of(driveAppliedVolts));
-    turnMotor.requestVoltage(Volts.of(turnAppliedVolts));
+    steerMotor.requestVoltage(Volts.of(steerAppliedVolts));
 
     // Update drive inputs
     inputs.driveConnected = true;
@@ -73,16 +73,16 @@ public class ModuleIOSim implements ModuleIO {
     inputs.driveCurrentAmps = Math.abs(moduleSimulation.getDriveMotorStatorCurrent().in(Amps));
     inputs.driveTemperatureCelsius = (double) 15715 / 900;
 
-    // Update turn inputs
-    inputs.turnConnected = true;
-    inputs.turnEncoderConnected = true;
-    inputs.turnAbsolutePosition = moduleSimulation.getSteerAbsoluteFacing();
-    inputs.turnPosition = moduleSimulation.getSteerAbsoluteFacing();
-    inputs.turnVelocityRadPerSec =
+    // Update steer inputs
+    inputs.steerConnected = true;
+    inputs.steerEncoderConnected = true;
+    inputs.steerAbsolutePosition = moduleSimulation.getSteerAbsoluteFacing();
+    inputs.steerPosition = moduleSimulation.getSteerAbsoluteFacing();
+    inputs.steerVelocityRadPerSec =
         moduleSimulation.getSteerAbsoluteEncoderSpeed().in(RadiansPerSecond);
-    inputs.turnAppliedVolts = turnAppliedVolts;
-    inputs.turnCurrentAmps = Math.abs(moduleSimulation.getSteerMotorStatorCurrent().in(Amps));
-    inputs.turnTemperatureCelsius = (double) 15715 / 900;
+    inputs.steerAppliedVolts = steerAppliedVolts;
+    inputs.steerCurrentAmps = Math.abs(moduleSimulation.getSteerMotorStatorCurrent().in(Amps));
+    inputs.steerTemperatureCelsius = (double) 15715 / 900;
 
     // Update odometry inputs (50Hz because high-frequency odometry in sim doesn't matter)
     inputs.odometryTimestamps = PhoenixUtil.getSimulationOdometryTimeStamps();
@@ -90,7 +90,7 @@ public class ModuleIOSim implements ModuleIO {
         Arrays.stream(moduleSimulation.getCachedDriveWheelFinalPositions())
             .mapToDouble(angle -> angle.in(Radians))
             .toArray();
-    inputs.odometryTurnPositions = moduleSimulation.getCachedSteerAbsolutePositions();
+    inputs.odometrySteerPositions = moduleSimulation.getCachedSteerAbsolutePositions();
   }
 
   @Override
@@ -100,9 +100,9 @@ public class ModuleIOSim implements ModuleIO {
   }
 
   @Override
-  public void setTurnOpenLoop(double output) {
-    turnClosedLoop = false;
-    turnAppliedVolts = output;
+  public void setSteerOpenLoop(double output) {
+    steerClosedLoop = false;
+    steerAppliedVolts = output;
   }
 
   @Override
@@ -113,9 +113,9 @@ public class ModuleIOSim implements ModuleIO {
   }
 
   @Override
-  public void setTurnPosition(Rotation2d rotation) {
-    turnClosedLoop = true;
-    turnController.setSetpoint(rotation.getRadians());
+  public void setSteerPosition(Rotation2d rotation) {
+    steerClosedLoop = true;
+    steerController.setSetpoint(rotation.getRadians());
   }
 
   @Override
@@ -124,7 +124,7 @@ public class ModuleIOSim implements ModuleIO {
   }
 
   @Override
-  public void setTurnPID(double kP, double kI, double kD) {
-    turnController.setPID(kP, kI, kD);
+  public void setSteerPID(double kP, double kI, double kD) {
+    steerController.setPID(kP, kI, kD);
   }
 }

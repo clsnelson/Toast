@@ -29,8 +29,8 @@ public class Module {
       new LoggedTunableNumber("Drive/Module/DrivekP");
   private static final LoggedTunableNumber drivekD =
       new LoggedTunableNumber("Drive/Module/DrivekD");
-  private static final LoggedTunableNumber turnkP = new LoggedTunableNumber("Drive/Module/TurnkP");
-  private static final LoggedTunableNumber turnkD = new LoggedTunableNumber("Drive/Module/TurnkD");
+  private static final LoggedTunableNumber steerkP = new LoggedTunableNumber("Drive/Module/TurnkP");
+  private static final LoggedTunableNumber steerkD = new LoggedTunableNumber("Drive/Module/TurnkD");
 
   static {
     if (Constants.currentMode == Constants.Mode.REAL) {
@@ -40,16 +40,16 @@ public class Module {
       drivekP.initDefault(0.2);
       drivekD.initDefault(0.0);
 
-      turnkP.initDefault(100);
-      turnkD.initDefault(0.3);
+      steerkP.initDefault(100);
+      steerkD.initDefault(0.3);
     } else {
       // Simulating, use simulated constants
       drivekS.initDefault(0.03);
       drivekV.initDefault(1.0 / Units.rotationsToRadians(1.0 / 0.91035));
       drivekP.initDefault(0.1);
       drivekD.initDefault(0);
-      turnkP.initDefault(10.0);
-      turnkD.initDefault(0);
+      steerkP.initDefault(10.0);
+      steerkD.initDefault(0);
     }
   }
 
@@ -60,8 +60,8 @@ public class Module {
   private SimpleMotorFeedforward ffModel;
 
   private final Alert driveDisconnectedAlert;
-  private final Alert turnDisconnectedAlert;
-  private final Alert turnEncoderDisconnectedAlert;
+  private final Alert steerDisconnectedAlert;
+  private final Alert steerEncoderDisconnectedAlert;
 
   @Getter private SwerveModulePosition[] odometryPositions = new SwerveModulePosition[] {};
 
@@ -73,10 +73,10 @@ public class Module {
 
     driveDisconnectedAlert =
         new Alert("Disconnected drive motor on module " + name + ".", Alert.AlertType.kError);
-    turnDisconnectedAlert =
-        new Alert("Disconnected turn motor on module " + name + ".", Alert.AlertType.kError);
-    turnEncoderDisconnectedAlert =
-        new Alert("Disconnected turn encoder on module " + name + ".", Alert.AlertType.kError);
+    steerDisconnectedAlert =
+        new Alert("Disconnected steer motor on module " + name + ".", Alert.AlertType.kError);
+    steerEncoderDisconnectedAlert =
+        new Alert("Disconnected steer encoder on module " + name + ".", Alert.AlertType.kError);
   }
 
   public void updateInputs() {
@@ -92,8 +92,8 @@ public class Module {
     if (drivekP.hasChanged(hashCode()) || drivekD.hasChanged(hashCode())) {
       io.setDrivePID(drivekP.get(), 0, drivekD.get());
     }
-    if (turnkP.hasChanged(hashCode()) || turnkD.hasChanged(hashCode())) {
-      io.setTurnPID(turnkP.get(), 0, turnkD.get());
+    if (steerkP.hasChanged(hashCode()) || steerkD.hasChanged(hashCode())) {
+      io.setSteerPID(steerkP.get(), 0, steerkD.get());
     }
 
     // Calculate positions for odometry
@@ -102,14 +102,14 @@ public class Module {
     for (int i = 0; i < sampleCount; i++) {
       double positionMeters =
           inputs.odometryDrivePositionsRad[i] * DriveConstants.wheelRadius.in(Meters);
-      Rotation2d angle = inputs.odometryTurnPositions[i];
+      Rotation2d angle = inputs.odometrySteerPositions[i];
       odometryPositions[i] = new SwerveModulePosition(positionMeters, angle);
     }
 
     // Update alerts
     driveDisconnectedAlert.set(!inputs.driveConnected);
-    turnDisconnectedAlert.set(!inputs.turnConnected);
-    turnEncoderDisconnectedAlert.set(!inputs.turnEncoderConnected);
+    steerDisconnectedAlert.set(!inputs.steerConnected);
+    steerEncoderDisconnectedAlert.set(!inputs.steerEncoderConnected);
   }
 
   /**
@@ -128,11 +128,12 @@ public class Module {
     io.setDriveVelocity(
         speedRadPerSec, ffModel.calculate(speedRadPerSec) + wheelTorqueNm * drivekT.get());
 
-    // Prevent wheel turning from messing with alignment
-    if (Math.abs(state.angle.minus(getAngle()).getDegrees()) < DriveConstants.turnDeadbandDegrees) {
-      io.setTurnOpenLoop(0.0);
+    // Prevent wheel steering from messing with alignment
+    if (Math.abs(state.angle.minus(getAngle()).getDegrees())
+        < DriveConstants.steerDeadbandDegrees) {
+      io.setSteerOpenLoop(0.0);
     } else {
-      io.setTurnPosition(state.angle);
+      io.setSteerPosition(state.angle);
     }
   }
 
@@ -141,29 +142,30 @@ public class Module {
     double speedRadPerSec = state.speedMetersPerSecond / DriveConstants.wheelRadius.in(Meters);
     io.setDriveVelocity(speedRadPerSec, ffModel.calculate(speedRadPerSec));
 
-    // Prevent wheel turning from messing with alignment
-    if (Math.abs(state.angle.minus(getAngle()).getDegrees()) < DriveConstants.turnDeadbandDegrees) {
-      io.setTurnOpenLoop(0.0);
+    // Prevent wheel steering from messing with alignment
+    if (Math.abs(state.angle.minus(getAngle()).getDegrees())
+        < DriveConstants.steerDeadbandDegrees) {
+      io.setSteerOpenLoop(0.0);
     } else {
-      io.setTurnPosition(state.angle);
+      io.setSteerPosition(state.angle);
     }
   }
 
   /** Runs the module with the specified output while controlling to zero degrees. */
   public void runCharacterization(double output) {
     io.setDriveOpenLoop(output);
-    io.setTurnPosition(Rotation2d.kZero);
+    io.setSteerPosition(Rotation2d.kZero);
   }
 
   /** Disables all outputs to motors. */
   public void stop() {
     io.setDriveOpenLoop(0.0);
-    io.setTurnOpenLoop(0.0);
+    io.setSteerOpenLoop(0.0);
   }
 
-  /** Returns the current turn angle of the module. */
+  /** Returns the current steer angle of the module. */
   public Rotation2d getAngle() {
-    return inputs.turnPosition;
+    return inputs.steerPosition;
   }
 
   /** Returns the current drive position of the module in meters. */
@@ -176,12 +178,12 @@ public class Module {
     return inputs.driveVelocityRadPerSec * DriveConstants.wheelRadius.in(Meters);
   }
 
-  /** Returns the module position (turn angle and drive position). */
+  /** Returns the module position (steer angle and drive position). */
   public SwerveModulePosition getPosition() {
     return new SwerveModulePosition(getPositionMeters(), getAngle());
   }
 
-  /** Returns the module state (turn angle and drive velocity). */
+  /** Returns the module state (steer angle and drive velocity). */
   public SwerveModuleState getState() {
     return new SwerveModuleState(getVelocityMetersPerSec(), getAngle());
   }

@@ -22,7 +22,7 @@ public class DriveConstants {
 
   public static final double maxLinearSpeedMetersPerSecond = 4.2;
   public static final double maxAngularSpeedRadPerSec = 4.2 / driveBaseRadiusMeters;
-  public static final double turnDeadbandDegrees = 0.3;
+  public static final double steerDeadbandDegrees = 0.3;
 
   public static final Distance wheelRadius = Inches.of(2.0);
 

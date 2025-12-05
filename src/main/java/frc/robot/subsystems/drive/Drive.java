@@ -394,7 +394,7 @@ public class Drive extends SubsystemBase {
   }
 
   /**
-   * Stops the drive and turns the modules to an X arrangement to resist movement. The modules will
+   * Stops the drive and steers the modules to an X arrangement to resist movement. The modules will
    * return to their normal orientations the next time a nonzero velocity is requested.
    */
   public void stopWithX() {
@@ -418,7 +418,7 @@ public class Drive extends SubsystemBase {
     return run(() -> runCharacterization(0.0)).withTimeout(1.0).andThen(sysId.dynamic(direction));
   }
 
-  /** Returns the module states (turn angles and drive velocities) for all the modules. */
+  /** Returns the module states (steer angles and drive velocities) for all the modules. */
   @AutoLogOutput(key = "Drive/States/Measured")
   private SwerveModuleState[] getModuleStates() {
     SwerveModuleState[] states = new SwerveModuleState[4];
@@ -428,7 +428,7 @@ public class Drive extends SubsystemBase {
     return states;
   }
 
-  /** Returns the module positions (turn angles and drive positions) for all the modules. */
+  /** Returns the module positions (steer angles and drive positions) for all the modules. */
   private SwerveModulePosition[] getModulePositions() {
     SwerveModulePosition[] states = new SwerveModulePosition[4];
     for (int i = 0; i < 4; i++) {

@@ -13,18 +13,18 @@ public interface ModuleIO {
     public double driveCurrentAmps = 0.0;
     public double driveTemperatureCelsius = 0.0;
 
-    public boolean turnConnected = false;
-    public boolean turnEncoderConnected = false;
-    public Rotation2d turnAbsolutePosition = Rotation2d.kZero;
-    public Rotation2d turnPosition = Rotation2d.kZero;
-    public double turnVelocityRadPerSec = 0.0;
-    public double turnAppliedVolts = 0.0;
-    public double turnCurrentAmps = 0.0;
-    public double turnTemperatureCelsius = 0.0;
+    public boolean steerConnected = false;
+    public boolean steerEncoderConnected = false;
+    public Rotation2d steerAbsolutePosition = Rotation2d.kZero;
+    public Rotation2d steerPosition = Rotation2d.kZero;
+    public double steerVelocityRadPerSec = 0.0;
+    public double steerAppliedVolts = 0.0;
+    public double steerCurrentAmps = 0.0;
+    public double steerTemperatureCelsius = 0.0;
 
     public double[] odometryTimestamps = new double[] {};
     public double[] odometryDrivePositionsRad = new double[] {};
-    public Rotation2d[] odometryTurnPositions = new Rotation2d[] {};
+    public Rotation2d[] odometrySteerPositions = new Rotation2d[] {};
   }
 
   /** Updates the set of loggable inputs. */
@@ -33,20 +33,20 @@ public interface ModuleIO {
   /** Run the drive motor at the specified open loop value. */
   default void setDriveOpenLoop(double output) {}
 
-  /** Run the turn motor at the specified open loop value. */
-  default void setTurnOpenLoop(double output) {}
+  /** Run the steer motor at the specified open loop value. */
+  default void setSteerOpenLoop(double output) {}
 
   /** Run the drive motor at the specified velocity. */
   default void setDriveVelocity(double velocityRadPerSec, double feedforward) {}
 
-  /** Run the turn motor to the specified rotation. */
-  default void setTurnPosition(Rotation2d rotation) {}
+  /** Run the steer motor to the specified rotation. */
+  default void setSteerPosition(Rotation2d rotation) {}
 
   /** Set P, I, and D gains for closed loop control on drive motor. */
   default void setDrivePID(double kP, double kI, double kD) {}
 
-  /** Set P, I, and D gains for closed loop control on turn motor. */
-  default void setTurnPID(double kP, double kI, double kD) {}
+  /** Set P, I, and D gains for closed loop control on steer motor. */
+  default void setSteerPID(double kP, double kI, double kD) {}
 
   /** Set brake mode on drive motor */
   default void setBrakeMode(boolean enabled) {}
