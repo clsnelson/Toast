@@ -116,5 +116,11 @@ class RobotContainer:
             ), self._drivetrain
         ).ignoringDisable(True))
 
+        # Feedforward characterization
+        self._driver.x().whileTrue(commands.feedforwardCharacterization(self._drivetrain))
+
+        # Wheel radius characterization
+        self._driver.b().whileTrue(commands.wheelRadiusCharacterization(self._drivetrain))
+
     def get_autonomous_command(self) -> commands2.Command:
         return self.autoChooser.getSelected()

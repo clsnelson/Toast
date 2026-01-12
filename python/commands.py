@@ -1,18 +1,23 @@
 import math
+from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Final, List, Callable
 
-from commands2 import Command, cmd
+from commands2 import Command, cmd, ConditionalCommand
+from phoenix6.swerve import SwerveModuleConstants, ClosedLoopOutputType
 from pykit.logger import Logger
-from wpilib import DriverStation
+from wpilib import DriverStation, Timer, RobotBase
 from wpimath import applyDeadband
 from wpimath.controller import PIDController, ProfiledPIDController
+from wpimath.filter import SlewRateLimiter
 from wpimath.geometry import Pose2d, Rotation2d, Translation2d, Transform2d
 from wpimath.kinematics import ChassisSpeeds
 from wpimath.trajectory import TrapezoidProfile
+from wpimath.units import metersToInches
 
 from constants import Constants
 from subsystems.drive import Drive, DriveConstants
+from subsystems.drive.module import ModuleIOTalonFX
 from util import LoggedTunableNumber
 
 _deadband: Final[float] = 0.1
@@ -244,3 +249,121 @@ def alignToClosestBranch(drive: Drive, branchSide: BranchSide, xSupplier: Callab
     return cmd.runOnce(setup).andThen(
         cmd.run(periodic, drive)
     ).beforeStarting(reset).withName("AlignToClosestReedBranch")
+
+def feedforwardCharacterization(drive: Drive) -> Command:
+    """
+    Measures the velocity feedforward constants for the drive motors.
+    This command can only be used in voltage control mode.
+    """
+    velocitySamples = []
+    voltageSamples = []
+    timer = Timer()
+
+    def results():
+        n = len(velocitySamples)
+        sumX = 0.0
+        sumY = 0.0
+        sumXY = 0.0
+        sumX2 = 0.0
+        for i in range(n):
+            sumX += velocitySamples[i]
+            sumY += voltageSamples[i]
+            sumXY += velocitySamples[i] * voltageSamples[i]
+            sumX2 += velocitySamples[i]**2
+        kS = (sumY * sumX2 - sumX * sumXY) / (n * sumX2 - sumX**2)
+        kV = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX**2)
+
+        print("********** Drive FF Characterization Results **********")
+        print(f"\tkS: {kS:.5f}")
+        print(f"\tkV: {kV:.5f}")
+
+    def error():
+        raise RuntimeError("Drive motor ClosedLoopOutputType must be Voltage.")
+
+    return ConditionalCommand(
+        cmd.sequence(
+            # Reset data
+            cmd.runOnce(
+                lambda: (velocitySamples.clear(), voltageSamples.clear())
+            ),
+
+            # Allow modules to orient
+            cmd.run(lambda: drive.runCharacterization(0.0), drive).withTimeout(_feedForwardStartDelay),
+
+            # Start timer
+            cmd.runOnce(lambda: timer.restart()),
+
+            # Accelerate and gather data
+            cmd.run(
+                lambda: (
+                    drive.runCharacterization(timer.get() * _feedForwardRampRate),
+                    velocitySamples.append(drive.getFFCharacterizationVelocity()),
+                    voltageSamples.append(timer.get() * _feedForwardRampRate)
+                ),
+                drive
+            ).finallyDo( # When cancelled, calculate and print results
+                lambda _: results()
+            )
+        ),
+        cmd.runOnce(lambda: error()),
+        lambda: ModuleIOTalonFX.driveClosedLoopOutput == ClosedLoopOutputType.VOLTAGE or RobotBase.isSimulation()
+    )
+
+def wheelRadiusCharacterization(drive: Drive) -> Command:
+
+    @dataclass
+    class WheelRadiusCharacterizationState:
+        positions: List[float] = field(default_factory=list)
+        lastAngle: Rotation2d = field(default_factory=Rotation2d)
+        gyroDelta: float = 0.0
+
+    limiter = SlewRateLimiter(_wheelRadiusRampRate)
+    state = WheelRadiusCharacterizationState()
+
+    def record_start():
+        state.positions = drive.getWheelRadiusCharacterizationPositions()
+        state.lastAngle = drive.getRotation()
+        state.gyroDelta = 0.0
+
+    def update():
+        rotation = drive.getRotation()
+        state.gyroDelta += abs((rotation - state.lastAngle).radians())
+        state.lastAngle = rotation
+
+    def results():
+        positions = drive.getWheelRadiusCharacterizationPositions()
+        wheelDelta = 0.0
+        n = len(Drive.getModuleTranslations())
+        for i in range(n):
+            wheelDelta += abs(positions[i] - state.positions[i]) / float(n)
+        wheelRadius = (state.gyroDelta * DriveConstants.driveBaseRadius) / wheelDelta
+        print("********** Wheel Radius Characterization Results **********")
+        print(f"\tWheel Delta: {wheelDelta:.3f} radians")
+        print(f"\tGyro Delta: {state.gyroDelta:.3f} radians")
+        print(f"\tWheel Radius: {wheelRadius:.3f} meters / {metersToInches(wheelRadius):.3f} inches")
+
+    return cmd.parallel(
+        # Drive control sequence
+        cmd.sequence(
+            # Reset acceleration limiter
+            cmd.runOnce(lambda: limiter.reset(0.0)),
+
+            # Turn in place, accelerating up to full speed
+            cmd.run(
+                lambda: drive.runVelocity(ChassisSpeeds(0.0, 0.0, limiter.calculate(_wheelRadiusMaxVel))),
+                drive
+            )
+        ),
+
+        # Measurement sequence
+        cmd.sequence(
+            # Wait for modules to fully orient before starting measurement
+            cmd.waitSeconds(1.0),
+
+            # Record stating measurement
+            cmd.runOnce(record_start),
+
+            # Update gyro delta. When cancelled, calculate and print results
+            cmd.run(update).finallyDo(lambda _: results)
+        )
+    ).withName("WheelRadiusCharacterization")

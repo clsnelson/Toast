@@ -276,6 +276,17 @@ class Drive(Subsystem):
         """Returns the measured chassis speeds of the robot."""
         return self._kinematics.toChassisSpeeds(self._getModuleStates())
 
+    def getWheelRadiusCharacterizationPositions(self) -> List[float]:
+        """Returns the position of each module in radians."""
+        return [m.getWheelRadiusCharacterizationPosition() for m in self._modules]
+
+    def getFFCharacterizationVelocity(self) -> float:
+        """Returns the average velocity of the modules in rotations/sec (Phoenix native units)."""
+        output = 0.0
+        for m in self._modules:
+            output += m.getFFCharacterizationVelocity() / 4.0
+        return output
+
     @autolog_output("Drive/EstimatedPosition")
     def getPose(self) -> Pose2d:
         return self._poseEstimator.getEstimatedPosition()
