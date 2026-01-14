@@ -1,6 +1,6 @@
 [tool.robotpy]
 
-robotpy_version = "2025.3.2.2"
+robotpy_version = "2026.1.1"
 
 components = [
     "commands2",
@@ -9,7 +9,7 @@ components = [
 
 # Other pip packages to install
 requires = [
-    "robotpy-pykit",
+    "robotpy-pykit>=1.0.1",
     "robotpy-opencv; platform_machine == 'roborio'",
     "opencv-python; platform_machine != 'roborio'"
 ]

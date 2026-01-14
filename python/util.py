@@ -194,6 +194,8 @@ class LoggedTunableNumber:
     _tableKey = "/Tuning"
 
     def __init__(self, dashboardKey: str, defaultValue: float|None=None) -> None:
+        self._defaultValue = None
+        self._dashboardNumber = None
         self._key = f"{self._tableKey}/{dashboardKey}"
         self._lastHasChangedValues = {}
         self._hasDefault = False

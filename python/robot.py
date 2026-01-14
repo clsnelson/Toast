@@ -1,6 +1,4 @@
-import math
 import os.path
-import sys
 from typing import Final
 
 import wpilib
