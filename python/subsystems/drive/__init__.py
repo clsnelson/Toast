@@ -29,10 +29,16 @@ from util import LoggedTunableNumber, LoggedTracer, PhoenixOdometryThread
 
 @autologgable_output
 class Drive(Subsystem):
+    # Amount of time to wait before engaging coast mode
     coastWaitTime: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/CoastWaitTimeSeconds", 0.5)
+
+    # Minimum speed before counting to coastWaitTime
     coastMetersPerSecondThreshold: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/CoastMetersPerSecThreshold", 0.05)
 
+    # P value for tip (IN DEGREES, NOT RADIANS)
     tipKp: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/AntiTip/TipKp", 0.03)
+
+    # Minimum degrees before engaging anti-tip. Reminder: Anti-tip overrides ALL inputs, in teleop and auto. Be conservative.
     tipThreshold: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/AntiTip/TipThreshold", 3)
 
     class CoastRequest(Enum):

@@ -165,7 +165,7 @@ class ModuleIOTalonFX(ModuleIO):
         self._steerTemperature = self._steerTalon.get_device_temp()
 
         # Configure periodic frames
-        BaseStatusSignal.set_update_frequency_for_all(250, self._drivePosition, self._steerPosition)
+        BaseStatusSignal.set_update_frequency_for_all(DriveConstants.odomFrequency, self._drivePosition, self._steerPosition)
         BaseStatusSignal.set_update_frequency_for_all(
             50,
             self._driveVelocity,
@@ -372,11 +372,23 @@ class ModuleIOSim(ModuleIO):
 
 
 class Module:
+    # NOTE: These comments assume Voltage-based control. Torque current feedforwards units can be found online.
+    # Static feedforward for drive motor (amount of volts to *just about* overcome static friction, find via tuner)
     _drivekS: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/Module/DrivekS")
+
+    # Velocity feedforward, amount of volts to maintain a constant speed
+    # Find using characterization or Phoenix Tuner (preferably characterization)
     _drivekV: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/Module/DrivekV")
+
+    # Torque feedforward, unused in voltage control.
+    # This only needs tuning if using different motors than KrakenX60FOC's
     _drivekT: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/Module/DrivekT", ModuleIOTalonFX.driveRatio / DCMotor.krakenX60FOC(1).Kt)
+
+    # P and D
     _drivekP: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/Module/DrivekP")
     _drivekD: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/Module/DrivekD")
+
+    # Steer P and D
     _steerkP: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/Module/TurnkP")
     _steerkD: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/Module/TurnkD")
 

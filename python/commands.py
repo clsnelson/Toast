@@ -4,7 +4,7 @@ from enum import Enum, auto
 from typing import Final, List, Callable
 
 from commands2 import Command, cmd, ConditionalCommand
-from phoenix6.swerve import SwerveModuleConstants, ClosedLoopOutputType
+from phoenix6.swerve import ClosedLoopOutputType
 from pykit.logger import Logger
 from wpilib import DriverStation, Timer, RobotBase
 from wpimath import applyDeadband
@@ -20,15 +20,31 @@ from subsystems.drive import Drive, DriveConstants
 from subsystems.drive.module import ModuleIOTalonFX
 from util import LoggedTunableNumber
 
+# Controller deadband
 _deadband: Final[float] = 0.1
+
+# Heading angle P and D
 _anglekP: Final[float] = 5.0
 _anglekD: Final[float] = 0.4
+
+# Heading angle PID max vel and acceleration
 _angleMaxVel: Final[float] = 8.0
 _angleMaxAccel: Final[float] = 20.0
+
+# Characterization configs
 _feedForwardStartDelay: Final[float] = 2.0
 _feedForwardRampRate: Final[float] = 0.1
 _wheelRadiusMaxVel: Final[float] = 0.25
 _wheelRadiusRampRate: Final[float] = 0.05
+
+# Skew Compensation Scalar
+# This counteracts drift when rotating and translating in teleop.
+
+# To measure:
+# 1. Drive in a straight line and rotate at max teleop speed.
+# 2. Check for translational drift
+# 3. Increment scalar
+# 4. Repeat until drift is negligible
 _skewCompensationScalar: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/SkewCompensationScalar", 0)
 
 __closestBranch: Pose2d | None = None
