@@ -1,6 +1,5 @@
-import math
 from enum import Enum, auto
-from typing import Callable, List, Final, Tuple
+from typing import Callable, Tuple
 
 import hal
 from commands2 import Subsystem, Command
@@ -17,29 +16,28 @@ from pykit.autolog import autolog_output, autologgable_output
 from pykit.logger import Logger
 from wpilib import Timer, DriverStation, Alert
 from wpimath.estimator import SwerveDrive4PoseEstimator
-from wpimath.geometry import Translation2d, Pose2d, Rotation2d, Pose3d, Twist3d
+from wpimath.geometry import Pose2d, Rotation2d, Pose3d, Twist3d
 from wpimath.kinematics import SwerveDrive4Kinematics, ChassisSpeeds, SwerveModuleState, SwerveModulePosition
-from wpimath.units import inchesToMeters
 
-from subsystems.drive.constants import DriveConstants
 from subsystems.drive.gyro import GyroIO
 from subsystems.drive.module import ModuleIO, Module
+from subsystems.toast import *
 from util import LoggedTunableNumber, LoggedTracer, PhoenixOdometryThread
 
 
 @autologgable_output
 class Drive(Subsystem):
     # Amount of time to wait before engaging coast mode
-    coastWaitTime: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/CoastWaitTimeSeconds", 0.5)
+    coastWaitTime: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/CoastWaitTimeSeconds", coastWaitTimeDefault)
 
     # Minimum speed before counting to coastWaitTime
-    coastMetersPerSecondThreshold: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/CoastMetersPerSecThreshold", 0.05)
+    coastMetersPerSecondThreshold: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/CoastMetersPerSecThreshold", coastMetersPerSecondThreshold)
 
     # P value for tip (IN DEGREES, NOT RADIANS)
-    tipKp: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/AntiTip/TipKp", 0.03)
+    tipKp: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/AntiTip/TipKp", tipKpDefault)
 
     # Minimum degrees before engaging anti-tip. Reminder: Anti-tip overrides ALL inputs, in teleop and auto. Be conservative.
-    tipThreshold: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/AntiTip/TipThreshold", 3)
+    tipThreshold: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/AntiTip/TipThreshold", tipThresholdDefault)
 
     class CoastRequest(Enum):
         AUTOMATIC = auto()
@@ -71,9 +69,6 @@ class Drive(Subsystem):
 
         self._antiTipSpeeds = ChassisSpeeds()
 
-        # Usage reporting (can't wait for people to go "AdvantageKit in Python???")
-        hal.report(hal.tResourceType.kResourceType_RobotDrive, hal.tInstances.kRobotDriveSwerve_AdvantageKit)
-
         self._kinematics: SwerveDrive4Kinematics = SwerveDrive4Kinematics(*self.getModuleTranslations())
 
         self._rawGyroRotation = Rotation2d()
@@ -90,9 +85,9 @@ class Drive(Subsystem):
             self.getChassisSpeeds,
             lambda speeds, feedforwards: self.runVelocity(speeds, feedforwards),
             PPHolonomicDriveController(
-                PIDConstants(5, 0, 0), PIDConstants(5, 0, 0)
+                PIDConstants(ppTranslationPID[0], ppTranslationPID[1], ppTranslationPID[2]), PIDConstants(ppRotationPID[0], ppRotationPID[1], ppRotationPID[2])
             ),
-            DriveConstants.getPathPlannerConfig(self.getModuleTranslations()),
+            pathPlannerConfig,
             lambda: (DriverStation.getAlliance() == DriverStation.Alliance.kRed) if DriverStation.getAlliance() is not None else False,
             self
         )
@@ -102,7 +97,7 @@ class Drive(Subsystem):
         PathPlannerLogging.setLogTargetPoseCallback(
             lambda targetPose: Logger.recordOutput("PathPlanner/TargetPose", targetPose))
 
-        self._setpointGenerator = SwerveSetpointGenerator(DriveConstants.getPathPlannerConfig(self.getModuleTranslations()), 10*math.pi)
+        self._setpointGenerator = SwerveSetpointGenerator(pathPlannerConfig, 10*math.pi)
         self._currentSetpoint = SwerveSetpoint(self.getChassisSpeeds(), list(self._getModuleStates()), DriveFeedforwards.zeros(4))
 
         # Configure SysId
@@ -165,19 +160,20 @@ class Drive(Subsystem):
 
         # Log 3D robot pose
         Logger.recordOutput("Drive/EstimatedPosition3d", Pose3d(self.getPose()).exp(
-            Twist3d(0, 0, abs(self._gyroInputs.pitchPosition.radians())*DriveConstants.trackWidthMeters/2, 0, self._gyroInputs.pitchPosition.radians(), 0)
+            Twist3d(0, 0, abs(self._gyroInputs.pitchPosition.radians())*trackWidthMeters/2, 0, self._gyroInputs.pitchPosition.radians(), 0)
         ).exp(
-            Twist3d(0, 0, abs(self._gyroInputs.rollPosition.radians())*DriveConstants.trackWidthMeters/2, self._gyroInputs.rollPosition.radians(), 0, 0)
+            Twist3d(0, 0, abs(self._gyroInputs.rollPosition.radians())*trackWidthMeters/2, self._gyroInputs.rollPosition.radians(), 0, 0)
         ))
 
         # Calculate anti-tip control
-        self._isTipping = abs(self._gyroInputs.pitchPosition.degrees()) > self.tipThreshold.get() or abs(self._gyroInputs.rollPosition.degrees()) > self.tipThreshold.get()
+        if antiTipEnabled:
+            self._isTipping = abs(self._gyroInputs.pitchPosition.degrees()) > self.tipThreshold.get() or abs(self._gyroInputs.rollPosition.degrees()) > self.tipThreshold.get()
 
         # Tilt direction
         tiltDirection = Rotation2d(math.atan2(-self._gyroInputs.rollPosition.degrees(), -self._gyroInputs.pitchPosition.degrees()))
 
         correctionSpeed = self.tipKp.get() * -math.hypot(self._gyroInputs.pitchPosition.degrees(), self._gyroInputs.rollPosition.degrees())
-        correctionSpeed = max(-DriveConstants.maxLinearSpeed/2, min(correctionSpeed, DriveConstants.maxLinearSpeed/2))
+        correctionSpeed = max(-maxLinearSpeed/2, min(correctionSpeed, maxLinearSpeed/2))
 
         # Correction vector (field-relative)
         correctionVector = Translation2d(0, 1).rotateBy(tiltDirection) * correctionSpeed
@@ -242,7 +238,7 @@ class Drive(Subsystem):
 
                 # Calculate wheel torque in direction
                 wheelForce = feedforwards.forcesNewtons[i]
-                wheelTorqueNm = wheelForce * inchesToMeters(DriveConstants.wheelRadius)
+                wheelTorqueNm = wheelForce * inchesToMeters(wheelRadius)
                 self._modules[i].runSetpointWithFeedforward(setpointStates[i], wheelTorqueNm)
 
                 wheelForces.append(SwerveModuleState(wheelTorqueNm, setpointStates[i].angle))
@@ -319,9 +315,4 @@ class Drive(Subsystem):
 
     @staticmethod
     def getModuleTranslations() -> List[Translation2d]:
-        return [
-            Translation2d(DriveConstants.trackWidthMeters / 2, DriveConstants.trackWidthMeters / 2),
-            Translation2d(DriveConstants.trackWidthMeters / 2, -DriveConstants.trackWidthMeters / 2),
-            Translation2d(-DriveConstants.trackWidthMeters / 2, DriveConstants.trackWidthMeters / 2),
-            Translation2d(-DriveConstants.trackWidthMeters / 2, -DriveConstants.trackWidthMeters / 2)
-        ]
+        return moduleTranslations

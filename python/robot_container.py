@@ -13,9 +13,10 @@ from wpimath.geometry import Pose2d, Rotation2d
 import commands
 from commands import fieldRelative
 from constants import Constants
-from subsystems.drive import Drive, DriveConstants
+from subsystems.drive import Drive
 from subsystems.drive.gyro import GyroIOPigeon2, GyroIOSim
 from subsystems.drive.module import ModuleIOTalonFX, ModuleIOSim
+from subsystems.toast import moduleConfigs
 from subsystems.vision import Vision
 from subsystems.vision.io import VisionIOLimelight
 
@@ -29,10 +30,10 @@ class RobotContainer:
                 # Real robot, instantiate hardware IO implementations
                 self._drivetrain = Drive(
                     GyroIOPigeon2(),
-                    ModuleIOTalonFX(DriveConstants.moduleConfigs[0]),
-                    ModuleIOTalonFX(DriveConstants.moduleConfigs[1]),
-                    ModuleIOTalonFX(DriveConstants.moduleConfigs[2]),
-                    ModuleIOTalonFX(DriveConstants.moduleConfigs[3]),
+                    ModuleIOTalonFX(moduleConfigs[0]),
+                    ModuleIOTalonFX(moduleConfigs[1]),
+                    ModuleIOTalonFX(moduleConfigs[2]),
+                    ModuleIOTalonFX(moduleConfigs[3]),
                     lambda _: None
                 )
                 self._vision = Vision(
@@ -43,10 +44,10 @@ class RobotContainer:
                 # Sim robot, instantiate physics sim IO implementations (if available)
                 self._drivetrain = Drive(
                     GyroIOSim(),
-                    ModuleIOSim(DriveConstants.moduleConfigs[0]),
-                    ModuleIOSim(DriveConstants.moduleConfigs[1]),
-                    ModuleIOSim(DriveConstants.moduleConfigs[2]),
-                    ModuleIOSim(DriveConstants.moduleConfigs[3]),
+                    ModuleIOSim(moduleConfigs[0]),
+                    ModuleIOSim(moduleConfigs[1]),
+                    ModuleIOSim(moduleConfigs[2]),
+                    ModuleIOSim(moduleConfigs[3]),
                     lambda _: None
                 )
                 self._vision = Vision(

@@ -2,9 +2,8 @@ from abc import ABC
 from collections import deque
 from concurrent.futures.thread import ThreadPoolExecutor
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import field
 from threading import Lock
-from typing import List, Final
 
 from phoenix6 import BaseStatusSignal
 from phoenix6.configs import TalonFXConfiguration
@@ -20,11 +19,10 @@ from wpimath.controller import PIDController, SimpleMotorFeedforwardMeters
 from wpimath.filter import Debouncer
 from wpimath.geometry import Rotation2d
 from wpimath.kinematics import SwerveModulePosition, SwerveModuleState
-from wpimath.system.plant import DCMotor, LinearSystemId
-from wpimath.units import *
+from wpimath.system.plant import LinearSystemId
 
 from constants import Constants
-from subsystems.drive import DriveConstants
+from subsystems.toast import *
 from util import tryUntilOk, LoggedTunableNumber, PhoenixOdometryThread
 
 rotations_per_second = float
@@ -85,19 +83,13 @@ class ModuleIOTalonFX(ModuleIO):
 
     _steerFeedbackType: Final[SteerFeedbackType] = SteerFeedbackType.FUSED_CANCODER
 
-    driveRatio: Final[float] = 6.746031746031747
-    steerRatio: Final[float] = 21.428571428571427
-
-    driveStatorLimit: Final[amperes] = 80
-    steerStatorLimit: Final[amperes] = 60
-
     _brakeModeExecutor: Final[ThreadPoolExecutor] = ThreadPoolExecutor(max_workers=8)
 
     _driveConnectedDebounce: Final[Debouncer] = Debouncer(0.5, Debouncer.DebounceType.kFalling)
     _steerConnectedDebounce: Final[Debouncer] = Debouncer(0.5, Debouncer.DebounceType.kFalling)
     _steerEncoderConnectedDebounce: Final[Debouncer] = Debouncer(0.5, Debouncer.DebounceType.kFalling)
 
-    def __init__(self, config: DriveConstants.ModuleConfig):
+    def __init__(self, config: ModuleConfig):
         self._driveTalon = TalonFX(config.driveMotorId, "*")
         self._steerTalon = TalonFX(config.steerMotorId, "*")
         self._cancoder = CANcoder(config.encoderId, "*")
@@ -105,10 +97,10 @@ class ModuleIOTalonFX(ModuleIO):
         # Configure drive motor
         self._driveConfig = TalonFXConfiguration()
         self._driveConfig.motor_output.neutral_mode = NeutralModeValue.BRAKE
-        self._driveConfig.feedback.sensor_to_mechanism_ratio = self.driveRatio
-        self._driveConfig.torque_current.peak_forward_torque_current = self.driveStatorLimit
-        self._driveConfig.torque_current.peak_reverse_torque_current = -self.driveStatorLimit
-        self._driveConfig.current_limits.stator_current_limit = self.driveStatorLimit
+        self._driveConfig.feedback.sensor_to_mechanism_ratio = driveRatio
+        self._driveConfig.torque_current.peak_forward_torque_current = driveStatorLimit
+        self._driveConfig.torque_current.peak_reverse_torque_current = -driveStatorLimit
+        self._driveConfig.current_limits.stator_current_limit = driveStatorLimit
         self._driveConfig.current_limits.stator_current_limit_enable = True
         self._driveConfig.motor_output.inverted = InvertedValue.CLOCKWISE_POSITIVE if config.isDriveInverted else InvertedValue.COUNTER_CLOCKWISE_POSITIVE
         tryUntilOk(5, lambda: self._driveTalon.configurator.apply(self._driveConfig, 0.25))
@@ -127,16 +119,16 @@ class ModuleIOTalonFX(ModuleIO):
                 self._steerConfig.feedback.feedback_sensor_source = FeedbackSensorSourceValue.SYNC_CANCODER
             case _:
                 raise RuntimeError("FeedbackSource not supported.")
-        self._steerConfig.feedback.rotor_to_sensor_ratio = self.steerRatio
+        self._steerConfig.feedback.rotor_to_sensor_ratio = steerRatio
         self._steerConfig.closed_loop_general.continuous_wrap = True
-        self._steerConfig.torque_current.peak_forward_torque_current = self.steerStatorLimit
-        self._steerConfig.torque_current.peak_reverse_torque_current = -self.steerStatorLimit
-        self._steerConfig.current_limits.stator_current_limit = self.steerStatorLimit
+        self._steerConfig.torque_current.peak_forward_torque_current = steerStatorLimit
+        self._steerConfig.torque_current.peak_reverse_torque_current = -steerStatorLimit
+        self._steerConfig.current_limits.stator_current_limit = steerStatorLimit
         self._steerConfig.current_limits.stator_current_limit_enable = True
         self._steerConfig.motor_output.inverted = InvertedValue.CLOCKWISE_POSITIVE if config.isSteerInverted else InvertedValue.COUNTER_CLOCKWISE_POSITIVE
-        self._steerConfig.motion_magic.motion_magic_cruise_velocity = 100 / self.steerRatio
+        self._steerConfig.motion_magic.motion_magic_cruise_velocity = 100 / steerRatio
         self._steerConfig.motion_magic.motion_magic_acceleration = self._steerConfig.motion_magic.motion_magic_cruise_velocity / 0.1
-        self._steerConfig.motion_magic.motion_magic_expo_k_v = 0.12 * self.steerRatio
+        self._steerConfig.motion_magic.motion_magic_expo_k_v = 0.12 * steerRatio
         self._steerConfig.motion_magic.motion_magic_expo_k_a = 0.1
         tryUntilOk(5, lambda: self._steerTalon.configurator.apply(self._steerConfig, 0.25))
 
@@ -165,7 +157,7 @@ class ModuleIOTalonFX(ModuleIO):
         self._steerTemperature = self._steerTalon.get_device_temp()
 
         # Configure periodic frames
-        BaseStatusSignal.set_update_frequency_for_all(DriveConstants.odomFrequency, self._drivePosition, self._steerPosition)
+        BaseStatusSignal.set_update_frequency_for_all(odomFrequency, self._drivePosition, self._steerPosition)
         BaseStatusSignal.set_update_frequency_for_all(
             50,
             self._driveVelocity,
@@ -280,18 +272,16 @@ class ModuleIOTalonFX(ModuleIO):
 
 
 class ModuleIOSim(ModuleIO):
-    _driveGearbox = DCMotor.krakenX60FOC(1)
-    _steerGearbox = DCMotor.krakenX60FOC(1)
 
-    def __init__(self, config: DriveConstants.ModuleConfig) -> None:
+    def __init__(self, config: ModuleConfig) -> None:
         # Create drive and steer sim models
         self._driveSim = DCMotorSim(
-            LinearSystemId.DCMotorSystem(self._driveGearbox, 0.01, ModuleIOTalonFX.driveRatio),
-            self._driveGearbox
+            LinearSystemId.DCMotorSystem(driveMotor, 0.01, driveRatio),
+            driveMotor
         )
         self._steerSim = DCMotorSim(
-            LinearSystemId.DCMotorSystem(self._steerGearbox, 0.1, ModuleIOTalonFX.steerRatio),
-            self._steerGearbox
+            LinearSystemId.DCMotorSystem(steerMotor, 0.1, steerRatio),
+            steerMotor
         )
 
         self._driveClosedLoop = False
@@ -382,7 +372,7 @@ class Module:
 
     # Torque feedforward, unused in voltage control.
     # This only needs tuning if using different motors than KrakenX60FOC's
-    _drivekT: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/Module/DrivekT", ModuleIOTalonFX.driveRatio / DCMotor.krakenX60FOC(1).Kt)
+    _drivekT: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/Module/DrivekT", driveRatio / driveMotor.Kt)
 
     # P and D
     _drivekP: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/Module/DrivekP")
@@ -394,21 +384,21 @@ class Module:
 
     if Constants.currentMode == Constants.Mode.REAL:
         # Real robot, use actual constants
-        _drivekS.initDefault(0.141)
-        _drivekV.initDefault(0.82)
-        _drivekP.initDefault(0.2)
-        _drivekD.initDefault(0.0)
+        _drivekS.initDefault(drivekSReal)
+        _drivekV.initDefault(drivekVReal)
+        _drivekP.initDefault(drivekPReal)
+        _drivekD.initDefault(drivekDReal)
 
-        _steerkP.initDefault(100)
-        _steerkD.initDefault(0.3)
+        _steerkP.initDefault(steerkPReal)
+        _steerkD.initDefault(steerkDReal)
     else:
         # Simulating, use simulated constants
-        _drivekS.initDefault(0.03)
-        _drivekV.initDefault(1.0 / rotationsToRadians(1.0 / 0.91035))
-        _drivekP.initDefault(0.1)
-        _drivekD.initDefault(0)
-        _steerkP.initDefault(10.0)
-        _steerkD.initDefault(0)
+        _drivekS.initDefault(drivekSSim)
+        _drivekV.initDefault(drivekVSim)
+        _drivekP.initDefault(drivekPSim)
+        _drivekD.initDefault(drivekDSim)
+        _steerkP.initDefault(steerkPSim)
+        _steerkD.initDefault(steerkDSim)
 
     def __init__(self, io: ModuleIO, name: str) -> None:
         self._inputs = ModuleIO.ModuleIOInputs()
@@ -440,7 +430,7 @@ class Module:
         sampleCount = len(self._inputs.odometryTimestamps)
         self._odometryPositions = []
         for i in range(sampleCount):
-            positionMeters = self._inputs.odometryDrivePositions[i] * inchesToMeters(DriveConstants.wheelRadius)
+            positionMeters = self._inputs.odometryDrivePositions[i] * inchesToMeters(wheelRadius)
             angle = self._inputs.odometrySteerPositions[i]
             self._odometryPositions.append(SwerveModulePosition(positionMeters, angle))
 
@@ -450,11 +440,11 @@ class Module:
         self._steerEncoderDisconnectedAlert.set(not self._inputs.steerEncoderConnected)
 
     def runSetpoint(self, state: SwerveModuleState) -> None:
-        speedRadPerSec = state.speed / inchesToMeters(DriveConstants.wheelRadius)
+        speedRadPerSec = state.speed / inchesToMeters(wheelRadius)
         self._io.setDriveVelocity(speedRadPerSec, self._ffModel.calculate(speedRadPerSec))
 
         # Prevet wheel steering from messing with alignment
-        if abs((state.angle - self.getAngle()).degrees()) < DriveConstants.steerDeadband:
+        if abs((state.angle - self.getAngle()).degrees()) < steerDeadband:
             self._io.setSteerOpenLoop(0.0)
         else:
             self._io.setSteerPosition(state.angle)
@@ -465,11 +455,11 @@ class Module:
             return
 
         # Apply setpoints
-        speedRadPerSec = state.speed / inchesToMeters(DriveConstants.wheelRadius)
+        speedRadPerSec = state.speed / inchesToMeters(wheelRadius)
         self._io.setDriveVelocity(speedRadPerSec, self._ffModel.calculate(speedRadPerSec) + wheelTorqueNm * self._drivekT.get())
 
         # Prevent wheel steering from messing with alignment
-        if math.fabs((state.angle - self.getAngle()).degrees()) < DriveConstants.steerDeadband:
+        if math.fabs((state.angle - self.getAngle()).degrees()) < steerDeadband:
             self._io.setSteerOpenLoop(0.0)
         else:
             self._io.setSteerPosition(state.angle)
@@ -486,10 +476,10 @@ class Module:
         return self._inputs.steerPosition
 
     def getPositionMeters(self) -> meters:
-        return self._inputs.drivePosition * inchesToMeters(DriveConstants.wheelRadius)
+        return self._inputs.drivePosition * inchesToMeters(wheelRadius)
 
     def getVelocityMetersPerSec(self) -> meters_per_second:
-        return self._inputs.driveVelocity * inchesToMeters(DriveConstants.wheelRadius)
+        return self._inputs.driveVelocity * inchesToMeters(wheelRadius)
 
     def getPosition(self) -> SwerveModulePosition:
         return SwerveModulePosition(self.getPositionMeters(), self.getAngle())

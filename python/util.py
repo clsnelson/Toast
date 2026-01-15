@@ -78,9 +78,6 @@ class PhoenixOdometryThread(threading.Thread):
         return queue
 
     def run(self):
-        # DO NOT TOUCH unless you know what you're doing
-        # See AdvantageKit docs on realtime thread priority
-
         while True:
             # Wait for updates
             with self.signals_lock:

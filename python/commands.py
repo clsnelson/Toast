@@ -1,7 +1,6 @@
-import math
-from dataclasses import dataclass, field
+from dataclasses import field
 from enum import Enum, auto
-from typing import Final, List, Callable
+from typing import Callable
 
 from commands2 import Command, cmd, ConditionalCommand
 from phoenix6.swerve import ClosedLoopOutputType
@@ -10,14 +9,14 @@ from wpilib import DriverStation, Timer, RobotBase
 from wpimath import applyDeadband
 from wpimath.controller import PIDController, ProfiledPIDController
 from wpimath.filter import SlewRateLimiter
-from wpimath.geometry import Pose2d, Rotation2d, Translation2d, Transform2d
+from wpimath.geometry import Pose2d, Rotation2d, Transform2d
 from wpimath.kinematics import ChassisSpeeds
 from wpimath.trajectory import TrapezoidProfile
-from wpimath.units import metersToInches
 
 from constants import Constants
-from subsystems.drive import Drive, DriveConstants
+from subsystems.drive import Drive
 from subsystems.drive.module import ModuleIOTalonFX
+from subsystems.toast import *
 from util import LoggedTunableNumber
 
 # Controller deadband
@@ -45,7 +44,7 @@ _wheelRadiusRampRate: Final[float] = 0.05
 # 2. Check for translational drift
 # 3. Increment scalar
 # 4. Repeat until drift is negligible
-_skewCompensationScalar: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/SkewCompensationScalar", 0)
+_skewCompensationScalar: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/SkewCompensationScalar", skewCompensationScalarDefault)
 
 __closestBranch: Pose2d | None = None
 
@@ -118,9 +117,9 @@ def _getChassisSpeeds(drive: Drive, omegaSupplier: Callable[[], float], linearVe
     return ChassisSpeeds.fromRobotRelativeSpeeds(
         ChassisSpeeds.fromFieldRelativeSpeeds(
             ChassisSpeeds(
-                linearVelocity.X() * DriveConstants.maxLinearSpeed,
-                linearVelocity.Y() * DriveConstants.maxLinearSpeed,
-                omega * DriveConstants.maxAngularSpeed
+                linearVelocity.X() * maxLinearSpeed,
+                linearVelocity.Y() * maxLinearSpeed,
+                omega * maxAngularSpeed
             ), drive.getPose().rotation()
         ), drive.getPose().rotation() + skewCompensationFactor
     )
@@ -237,7 +236,7 @@ def alignToClosestBranch(drive: Drive, branchSide: BranchSide, xSupplier: Callab
 
         # Rotate robot relative velocity to field-centric
         clamped = max(-1.5, min(translationController.calculate(yError, 0.0), 1.5))
-        velY = applyDeadband(clamped, DriveConstants.maxLinearSpeed * 0.01)
+        velY = applyDeadband(clamped, maxLinearSpeed * 0.01)
 
         fieldRelativeVelocity = Translation2d(xSupplier() * targetRot.cos() + ySupplier() * targetRot.sin(), velY).rotateBy(targetRot)
 
@@ -352,7 +351,7 @@ def wheelRadiusCharacterization(drive: Drive) -> Command:
         n = len(Drive.getModuleTranslations())
         for i in range(n):
             wheelDelta += abs(positions[i] - state.positions[i]) / float(n)
-        wheelRadius = (state.gyroDelta * DriveConstants.driveBaseRadius) / wheelDelta
+        wheelRadius = (state.gyroDelta * driveBaseRadius) / wheelDelta
         print("********** Wheel Radius Characterization Results **********")
         print(f"\tWheel Delta: {wheelDelta:.3f} radians")
         print(f"\tGyro Delta: {state.gyroDelta:.3f} radians")

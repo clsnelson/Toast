@@ -10,7 +10,7 @@ from pykit.autolog import autolog
 from wpimath.geometry import Rotation2d
 from wpimath.units import *
 
-from subsystems.drive import DriveConstants
+from subsystems.toast import odomFrequency, gyroId
 from util import tryUntilOk, PhoenixOdometryThread
 
 
@@ -39,7 +39,7 @@ class GyroIO(ABC):
 class GyroIOPigeon2(GyroIO):
 
     def __init__(self) -> None:
-        self._pigeon: Final[Pigeon2] = Pigeon2(DriveConstants.PigeonConstants.id, "*")
+        self._pigeon: Final[Pigeon2] = Pigeon2(gyroId, "*")
         self._yaw: Final[StatusSignal[degrees]] = self._pigeon.get_yaw()
         self._yawVelocity: Final[StatusSignal[degrees_per_second]] = self._pigeon.get_angular_velocity_z_world()
         self._pitch: Final[StatusSignal[degrees]] = self._pigeon.get_pitch()
@@ -48,7 +48,7 @@ class GyroIOPigeon2(GyroIO):
         self._rollVelocity: Final[StatusSignal[degrees_per_second]] = self._pigeon.get_angular_velocity_y_world()
         self._pigeon.configurator.apply(Pigeon2Configuration())
         self._pigeon.configurator.set_yaw(0)
-        self._yaw.set_update_frequency(DriveConstants.odomFrequency)
+        self._yaw.set_update_frequency(odomFrequency)
         BaseStatusSignal.set_update_frequency_for_all(
             50, self._pitch, self._roll, self._yawVelocity, self._pitchVelocity, self._rollVelocity
         )

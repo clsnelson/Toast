@@ -1,4 +1,4 @@
-from typing import Callable, List
+from typing import Callable
 
 from commands2 import Subsystem
 from pykit.autolog import autologgable_output
@@ -7,7 +7,7 @@ from wpilib import Alert
 from wpimath.geometry import Pose2d
 
 from constants import Constants
-from subsystems.vision.constants import *
+from subsystems.toast import *
 from subsystems.vision.io import VisionIO, PoseObservationType
 from util import LoggedTracer
 
