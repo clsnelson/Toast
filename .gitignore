@@ -188,3 +188,4 @@ compile_commands.json
 /.vscode/
 /.wpilib/
 /simgui-ds.json
+/python/pyLogs/

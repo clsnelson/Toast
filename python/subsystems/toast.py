@@ -114,7 +114,6 @@ angularStdDevMegatag2Factor: Final[float] = math.inf # Ignore because the robot 
 
 
 """***TUNING CONSTANTS***"""
-# If tuning for the first time, *DO THIS LAST*.
 # All of these values should be tuned via tuningMode or PhoenixTuner.
 # When tuning swerve modules, tune them while on carpet for accurate results.
 
