@@ -1,7 +1,6 @@
 from enum import Enum, auto
 from typing import Callable, Tuple
 
-import hal
 from commands2 import Subsystem, Command
 from commands2.sysid import SysIdRoutine
 from pathplannerlib.auto import AutoBuilder
@@ -166,8 +165,7 @@ class Drive(Subsystem):
         ))
 
         # Calculate anti-tip control
-        if antiTipEnabled:
-            self._isTipping = abs(self._gyroInputs.pitchPosition.degrees()) > self.tipThreshold.get() or abs(self._gyroInputs.rollPosition.degrees()) > self.tipThreshold.get()
+        self._isTipping = abs(self._gyroInputs.pitchPosition.degrees()) > self.tipThreshold.get() or abs(self._gyroInputs.rollPosition.degrees()) > self.tipThreshold.get()
 
         # Tilt direction
         tiltDirection = Rotation2d(math.atan2(-self._gyroInputs.rollPosition.degrees(), -self._gyroInputs.pitchPosition.degrees()))
@@ -210,8 +208,13 @@ class Drive(Subsystem):
 
     def runVelocity(self, speeds: ChassisSpeeds, feedforwards: DriveFeedforwards|None=None) -> None:
         # Override input if we're tipping
-        if self._isTipping:
+        if self._isTipping and antiTipEnabled:
             speeds = self._antiTipSpeeds
+
+        # Only allow rotating in place in test mode (for characterization)
+        if DriverStation.isTest():
+            speeds.vx = 0.0
+            speeds.vy = 0.0
 
         # Calculate module setpoints
         setpointStatesUnoptimized = self._kinematics.toSwerveModuleStates(speeds)
