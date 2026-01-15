@@ -56,6 +56,7 @@ class Drive(Subsystem):
             Module(blModuleIO, "BackLeft"),
             Module(brModuleIO, "BackRight")
         )
+        self.setName("Drivetrain")
 
         self._gyroDisconnectedAlert = Alert("Disconnected gyro, using kinematics.", Alert.AlertType.kError)
 
@@ -311,6 +312,10 @@ class Drive(Subsystem):
     def setPose(self, pose: Pose2d) -> None:
         self._resetSimulationPoseCallback(pose)
         self._poseEstimator.resetPosition(self._rawGyroRotation, self._getModulePositions(), pose)
+
+    def addVisionMeasurement(self, visionRobotPoseMeters: Pose2d, timestampSeconds: float, visionMeasurementStdDevs: tuple[float, float, float]) -> None:
+        """Adds a new timestamped vision measurement."""
+        self._poseEstimator.addVisionMeasurement(visionRobotPoseMeters, timestampSeconds, visionMeasurementStdDevs)
 
     @staticmethod
     def getModuleTranslations() -> List[Translation2d]:

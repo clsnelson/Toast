@@ -9,7 +9,7 @@ components = [
 
 # Other pip packages to install
 requires = [
-    "robotpy-pykit>=1.0.1",
+    "robotpy-pykit",
     "robotpy-opencv; platform_machine == 'roborio'",
     "opencv-python; platform_machine != 'roborio'"
 ]

@@ -37,15 +37,15 @@ class GyroIO(ABC):
         pass
 
 class GyroIOPigeon2(GyroIO):
-    _pigeon: Final[Pigeon2] = Pigeon2(DriveConstants.PigeonConstants.id, "*")
-    _yaw: Final[StatusSignal[degrees]] = _pigeon.get_yaw()
-    _yawVelocity: Final[StatusSignal[degrees_per_second]] = _pigeon.get_angular_velocity_z_world()
-    _pitch: Final[StatusSignal[degrees]] = _pigeon.get_pitch()
-    _pitchVelocity: Final[StatusSignal[degrees_per_second]] = _pigeon.get_angular_velocity_x_world()
-    _roll: Final[StatusSignal[degrees]] = _pigeon.get_roll()
-    _rollVelocity: Final[StatusSignal[degrees_per_second]] = _pigeon.get_angular_velocity_y_world()
 
     def __init__(self) -> None:
+        self._pigeon: Final[Pigeon2] = Pigeon2(DriveConstants.PigeonConstants.id, "*")
+        self._yaw: Final[StatusSignal[degrees]] = self._pigeon.get_yaw()
+        self._yawVelocity: Final[StatusSignal[degrees_per_second]] = self._pigeon.get_angular_velocity_z_world()
+        self._pitch: Final[StatusSignal[degrees]] = self._pigeon.get_pitch()
+        self._pitchVelocity: Final[StatusSignal[degrees_per_second]] = self._pigeon.get_angular_velocity_x_world()
+        self._roll: Final[StatusSignal[degrees]] = self._pigeon.get_roll()
+        self._rollVelocity: Final[StatusSignal[degrees_per_second]] = self._pigeon.get_angular_velocity_y_world()
         self._pigeon.configurator.apply(Pigeon2Configuration())
         self._pigeon.configurator.set_yaw(0)
         self._yaw.set_update_frequency(DriveConstants.odomFrequency)

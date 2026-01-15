@@ -16,6 +16,8 @@ from constants import Constants
 from subsystems.drive import Drive, DriveConstants
 from subsystems.drive.gyro import GyroIOPigeon2, GyroIOSim
 from subsystems.drive.module import ModuleIOTalonFX, ModuleIOSim
+from subsystems.vision import Vision
+from subsystems.vision.io import VisionIOLimelight
 
 
 class RobotContainer:
@@ -33,9 +35,12 @@ class RobotContainer:
                     ModuleIOTalonFX(DriveConstants.moduleConfigs[3]),
                     lambda _: None
                 )
+                self._vision = Vision(
+                    self._drivetrain.addVisionMeasurement,
+                    VisionIOLimelight("limelight", self._drivetrain.getRotation)
+                )
             case Constants.Mode.SIM:
-                # Sim robot, instantiate physics sim IO implementations
-                # ... IF WE HAD ONE
+                # Sim robot, instantiate physics sim IO implementations (if available)
                 self._drivetrain = Drive(
                     GyroIOSim(),
                     ModuleIOSim(DriveConstants.moduleConfigs[0]),
@@ -43,6 +48,10 @@ class RobotContainer:
                     ModuleIOSim(DriveConstants.moduleConfigs[2]),
                     ModuleIOSim(DriveConstants.moduleConfigs[3]),
                     lambda _: None
+                )
+                self._vision = Vision(
+                    self._drivetrain.addVisionMeasurement,
+                    VisionIOLimelight("limelight", self._drivetrain.getRotation)
                 )
 
         # Auto chooser
