@@ -11,7 +11,7 @@ from wpimath.geometry import Rotation2d
 from wpimath.units import *
 
 from subsystems.toast import odomFrequency, gyroId
-from util import tryUntilOk, PhoenixOdometryThread
+from util import tryUntilOk, PhoenixOdometryThread, LoggedTunableNumber
 
 
 class GyroIO(ABC):
@@ -72,5 +72,14 @@ class GyroIOPigeon2(GyroIO):
         self._yawPositionQueue.clear()
 
 class GyroIOSim(GyroIO):
+
+    _simulatedGyroPitch: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/SimulatedGyroPitch", 0.0)
+    _simulatedGyroRoll: Final[LoggedTunableNumber] = LoggedTunableNumber("Drive/SimulatedGyroRoll", 0.0)
+
     def updateInputs(self, inputs: GyroIO.GyroIOInputs) -> None:
         inputs.connected = False
+
+        inputs.pitchPosition = Rotation2d.fromDegrees(self._simulatedGyroPitch.get())
+        inputs.pitchVelocityRadPerSec = 0.0
+        inputs.rollPosition = Rotation2d.fromDegrees(self._simulatedGyroRoll.get())
+        inputs.rollVelocityRadPerSec = 0.0

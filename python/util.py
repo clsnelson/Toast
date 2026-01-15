@@ -153,13 +153,13 @@ class LoggedNetworkNumber(LoggedNetworkInput):
         outer = self
 
         class LoggedNetworkNumberInputs(LoggableInputs):
-            def toLog(self, table: LogTable) -> None:
+            def toLog(self, table: LogTable, prefix: str) -> None:
                 table.put(
                     LoggedNetworkInput.removeSlash(outer._key),
                     outer._value
                 )
 
-            def fromLog(self, table: LogTable) -> None:
+            def fromLog(self, table: LogTable, prefix: str) -> None:
                 outer._value = table.get(
                     LoggedNetworkInput.removeSlash(outer._key),
                     outer._defaultValue
