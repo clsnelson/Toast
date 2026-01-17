@@ -10,10 +10,10 @@ from phoenix6.configs import TalonFXConfiguration
 from phoenix6.controls import VoltageOut, PositionVoltage, VelocityVoltage, TorqueCurrentFOC, PositionTorqueCurrentFOC, VelocityTorqueCurrentFOC
 from phoenix6.hardware import TalonFX, CANcoder, ParentDevice
 from phoenix6.signals import NeutralModeValue, InvertedValue, FeedbackSensorSourceValue
-from phoenix6.swerve import ClosedLoopOutputType, SteerFeedbackType
+from phoenix6.swerve import SteerFeedbackType
 from pykit.autolog import autolog
 from pykit.logger import Logger
-from wpilib import Alert, Timer
+from wpilib import Alert, Timer, RobotBase
 from wpilib.simulation import DCMotorSim
 from wpimath.controller import PIDController, SimpleMotorFeedforwardMeters
 from wpimath.filter import Debouncer
@@ -78,9 +78,6 @@ class ModuleIO(ABC):
         pass
 
 class ModuleIOTalonFX(ModuleIO):
-    _steerClosedLoopOutput: Final[ClosedLoopOutputType] = ClosedLoopOutputType.VOLTAGE
-    driveClosedLoopOutput: Final[ClosedLoopOutputType] = ClosedLoopOutputType.VOLTAGE
-
     _steerFeedbackType: Final[SteerFeedbackType] = SteerFeedbackType.FUSED_CANCODER
 
     _brakeModeExecutor: Final[ThreadPoolExecutor] = ThreadPoolExecutor(max_workers=8)
@@ -188,9 +185,16 @@ class ModuleIOTalonFX(ModuleIO):
         steerStatus = BaseStatusSignal.refresh_all(self._steerPosition, self._steerVelocity, self._steerAppliedVolts, self._steerCurrent, self._steerTemperature)
         steerEncoderStatus = BaseStatusSignal.refresh_all(self._steerAbsolutePosition)
 
+        # Update positions (with latency compensation)
+        drive_rot = BaseStatusSignal.get_latency_compensated_value(self._drivePosition, self._driveVelocity)
+        steer_rot = BaseStatusSignal.get_latency_compensated_value(self._steerPosition, self._steerVelocity)
+
+        # Due to coupling with the azimuth, back out drive_rot by azimuth coupling.
+        drive_rot -= steer_rot * couplingRatio
+
         # Update drive inputs
         inputs.driveConnected = self._driveConnectedDebounce.calculate(driveStatus.is_ok())
-        inputs.drivePosition = rotationsToRadians(self._drivePosition.value_as_double)
+        inputs.drivePosition = rotationsToRadians(drive_rot)
         inputs.driveVelocity = rotationsToRadians(self._driveVelocity.value_as_double)
         inputs.driveAppliedVolts = self._driveAppliedVolts.value_as_double
         inputs.driveCurrent = self._driveCurrent.value_as_double
@@ -200,7 +204,7 @@ class ModuleIOTalonFX(ModuleIO):
         inputs.steerConnected = self._steerConnectedDebounce.calculate(steerStatus.is_ok())
         inputs.steerEncoderConnected = self._steerEncoderConnectedDebounce.calculate(steerEncoderStatus.is_ok())
         inputs.steerAbsolutePosition = Rotation2d.fromRotations(self._steerAbsolutePosition.value_as_double)
-        inputs.steerPosition = Rotation2d.fromRotations(self._steerPosition.value_as_double)
+        inputs.steerPosition = Rotation2d.fromRotations(steer_rot)
         inputs.steerVelocity = rotationsToRadians(self._steerVelocity.value_as_double)
         inputs.steerAppliedVolts = self._steerAppliedVolts.value_as_double
         inputs.steerCurrentAmps = self._steerCurrent.value_as_double
@@ -215,14 +219,14 @@ class ModuleIOTalonFX(ModuleIO):
         self._steerPositionQueue.clear()
 
     def setDriveOpenLoop(self, output: float) -> None:
-        match self.driveClosedLoopOutput:
+        match driveClosedLoopOutput:
             case ClosedLoopOutputType.VOLTAGE:
                 self._driveTalon.set_control(self._voltageRequest.with_output(output))
             case ClosedLoopOutputType.TORQUE_CURRENT_FOC:
                 self._driveTalon.set_control(self._torqueCurrentRequest.with_output(output))
 
     def setSteerOpenLoop(self, output: float) -> None:
-        match self._steerClosedLoopOutput:
+        match steerClosedLoopOutput:
             case ClosedLoopOutputType.VOLTAGE:
                 self._steerTalon.set_control(self._voltageRequest.with_output(output))
             case ClosedLoopOutputType.TORQUE_CURRENT_FOC:
@@ -230,14 +234,14 @@ class ModuleIOTalonFX(ModuleIO):
     
     def setDriveVelocity(self, velocity: radians_per_second, feedforward: float) -> None:
         velocityRotPerSec = radiansToRotations(velocity)
-        match self.driveClosedLoopOutput:
+        match driveClosedLoopOutput:
             case ClosedLoopOutputType.VOLTAGE:
                 self._driveTalon.set_control(self._velocityVoltageRequest.with_velocity(velocityRotPerSec).with_feed_forward(feedforward))
             case ClosedLoopOutputType.TORQUE_CURRENT_FOC:
                 self._driveTalon.set_control(self._velocityTorqueCurrentRequest.with_velocity(velocityRotPerSec).with_feed_forward(feedforward))
                 
     def setSteerPosition(self, rotation: Rotation2d) -> None:
-        match self._steerClosedLoopOutput:
+        match steerClosedLoopOutput:
             case ClosedLoopOutputType.VOLTAGE:
                 self._steerTalon.set_control(self._positionVoltageRequest.with_position(rotation.degrees() / 360))
             case ClosedLoopOutputType.TORQUE_CURRENT_FOC:
@@ -258,9 +262,9 @@ class ModuleIOTalonFX(ModuleIO):
     def setBrakeMode(self, enabled: bool) -> None:
         mode = NeutralModeValue.BRAKE if enabled else NeutralModeValue.COAST
 
-        def _apply(lock: Lock, config: TalonFXConfiguration, talon: TalonFX, mode: NeutralModeValue):
+        def _apply(lock: Lock, config: TalonFXConfiguration, talon: TalonFX, neutralMode: NeutralModeValue):
             with lock:
-                config.motor_output.neutral_mode = mode
+                config.motor_output.neutral_mode = neutralMode
                 tryUntilOk(5, lambda: talon.configurator.apply(config, 0.25))
 
         self._brakeModeExecutor.submit(
@@ -439,34 +443,43 @@ class Module:
         self._steerDisconnectedAlert.set(not self._inputs.steerConnected)
         self._steerEncoderDisconnectedAlert.set(not self._inputs.steerEncoderConnected)
 
-    def runSetpoint(self, state: SwerveModuleState) -> None:
+    def runSetpoint(self, state: SwerveModuleState, wheelTorqueNm: float=0.0) -> None:
+        """
+        Applies the desired setpoint. This assumes module states are already optimized.
+        wheelTorque should only be applied when using Torque-current control.
+        """
+
+        # Apply drive velocity and cosine scalar
         speedRadPerSec = state.speed / inchesToMeters(wheelRadius)
-        self._io.setDriveVelocity(speedRadPerSec, self._ffModel.calculate(speedRadPerSec))
 
-        # Prevet wheel steering from messing with alignment
-        if abs((state.angle - self.getAngle()).degrees()) < steerDeadband:
-            self._io.setSteerOpenLoop(0.0)
-        else:
-            self._io.setSteerPosition(state.angle)
+        # Due to azimuth coupling, "back out" the speed based on steer velocity.
+        if RobotBase.isReal() and couplingRatioEnable:
+            speedRadPerSec += self._inputs.steerVelocity * rotationsToRadians(couplingRatio) / rotationsToRadians(driveRatio)
 
-    def runSetpointWithFeedforward(self, state: SwerveModuleState, wheelTorqueNm: float) -> None:
-        if ModuleIOTalonFX.driveClosedLoopOutput == ClosedLoopOutputType.VOLTAGE:
-            self.runSetpoint(state)
-            return
+        self._io.setDriveVelocity(speedRadPerSec,
+            self._ffModel.calculate(speedRadPerSec) +
+            (
+                wheelTorqueNm * self._drivekT.get()
+                if driveClosedLoopOutput == ClosedLoopOutputType.TORQUE_CURRENT_FOC
+                else 0
+            )
+        )
 
-        # Apply setpoints
-        speedRadPerSec = state.speed / inchesToMeters(wheelRadius)
-        self._io.setDriveVelocity(speedRadPerSec, self._ffModel.calculate(speedRadPerSec) + wheelTorqueNm * self._drivekT.get())
-
-        # Prevent wheel steering from messing with alignment
+        # Apply steer position if greater than steer deadband
         if math.fabs((state.angle - self.getAngle()).degrees()) < steerDeadband:
             self._io.setSteerOpenLoop(0.0)
         else:
             self._io.setSteerPosition(state.angle)
 
-    def runCharacterization(self, output: float) -> None:
+    def runDriveCharacterization(self, output: float) -> None:
+        """Faces all wheels forward and applies open loop voltage to drive motor."""
         self._io.setDriveOpenLoop(output)
         self._io.setSteerPosition(Rotation2d())
+
+    def runSteerCharacterization(self, output: float) -> None:
+        """Disables drive motors and applies open loop voltage to steer motor."""
+        self._io.setDriveOpenLoop(0.0)
+        self._io.setSteerOpenLoop(output)
 
     def stop(self) -> None:
         self._io.setDriveOpenLoop(0.0)

@@ -96,13 +96,13 @@ class Drive(Subsystem):
         PathPlannerLogging.setLogTargetPoseCallback(
             lambda targetPose: Logger.recordOutput("PathPlanner/TargetPose", targetPose))
 
-        self._setpointGenerator = SwerveSetpointGenerator(pathPlannerConfig, 10*math.pi)
+        self._setpointGenerator = SwerveSetpointGenerator(pathPlannerConfig, maxWheelRotationSpeed)
         self._currentSetpoint = SwerveSetpoint(self.getChassisSpeeds(), list(self._getModuleStates()), DriveFeedforwards.zeros(4))
 
         # Configure SysId
         self._sysId: Final[SysIdRoutine] = SysIdRoutine(
             SysIdRoutine.Config(recordState=lambda state: Logger.recordOutput("Drive/SysIdState", str(state))),
-            SysIdRoutine.Mechanism(lambda voltage: self.runCharacterization(voltage), lambda _: None, self)
+            SysIdRoutine.Mechanism(lambda voltage: self.runDriveCharacterization(voltage), lambda _: None, self)
         )
 
         self._coastRequest = self.CoastRequest.AUTOMATIC
@@ -219,7 +219,7 @@ class Drive(Subsystem):
         # Calculate module setpoints
         setpointStatesUnoptimized = self._kinematics.toSwerveModuleStates(speeds)
         self._currentSetpoint = self._setpointGenerator.generateSetpoint(self._currentSetpoint, speeds, 0.02)
-        setpointStates = self._currentSetpoint.module_states
+        setpointStates = self._kinematics.desaturateWheelSpeeds(tuple(self._currentSetpoint.module_states), maxLinearSpeed)
 
         # Log unoptimized setpoints and setpoint speeds
         Logger.recordOutput("Drive/States/SetpointsUnoptimized", setpointStatesUnoptimized)
@@ -227,8 +227,11 @@ class Drive(Subsystem):
         Logger.recordOutput("Drive/ChassisSpeeds/Setpoints", self._currentSetpoint.robot_relative_speeds)
 
         # Send setpoints to modules
-        if feedforwards is None:
+        if driveClosedLoopOutput == ClosedLoopOutputType.VOLTAGE or feedforwards is None:
             for i in range(4):
+                wheelAngle = self._getModuleStates()[i].angle
+                setpointStates[i].optimize(wheelAngle)
+                setpointStates[i].cosineScale(wheelAngle)
                 self._modules[i].runSetpoint(setpointStates[i])
         else:
             wheelForces = []
@@ -242,7 +245,7 @@ class Drive(Subsystem):
                 # Calculate wheel torque in direction
                 wheelForce = feedforwards.forcesNewtons[i]
                 wheelTorqueNm = wheelForce * inchesToMeters(wheelRadius)
-                self._modules[i].runSetpointWithFeedforward(setpointStates[i], wheelTorqueNm)
+                self._modules[i].runSetpoint(setpointStates[i], wheelTorqueNm)
 
                 wheelForces.append(SwerveModuleState(wheelTorqueNm, setpointStates[i].angle))
             Logger.recordOutput("Drive/States/ModuleForces", wheelForces)
@@ -250,8 +253,11 @@ class Drive(Subsystem):
         # Log optimized setpoints (runSetpoint mutates each state)
         Logger.recordOutput("Drive/States/SetpointsOptimized", setpointStates)
 
-    def runCharacterization(self, output: float) -> None:
-        [m.runCharacterization(output) for m in self._modules]
+    def runDriveCharacterization(self, output: float) -> None:
+        [m.runDriveCharacterization(output) for m in self._modules]
+
+    def runSteerCharacterization(self, output: float) -> None:
+        [m.runSteerCharacterization(output) for m in self._modules]
 
     def stop(self) -> None:
         self.runVelocity(ChassisSpeeds())
@@ -264,17 +270,17 @@ class Drive(Subsystem):
         self.stop()
 
     def sysIdQuasistatic(self, direction: SysIdRoutine.Direction) -> Command:
-        return self.run(lambda: self.runCharacterization(0.0)).withTimeout(1).andThen(self._sysId.quasistatic(direction))
+        return self.run(lambda: self.runDriveCharacterization(0.0)).withTimeout(1).andThen(self._sysId.quasistatic(direction))
 
     def sysIdDynamic(self, direction: SysIdRoutine.Direction) -> Command:
-        return self.run(lambda: self.runCharacterization(0.0)).withTimeout(1).andThen(self._sysId.dynamic(direction))
+        return self.run(lambda: self.runDriveCharacterization(0.0)).withTimeout(1).andThen(self._sysId.dynamic(direction))
 
     @autolog_output("Drive/States/Measured")
-    def _getModuleStates(self) -> tuple[SwerveModuleState, SwerveModuleState, SwerveModuleState, SwerveModuleState]:
+    def _getModuleStates(self) -> tuple[SwerveModuleState, ...]:
         """Returns the module states (steer angles and drive velocities) for all the modules."""
         return tuple(m.getState() for m in self._modules)
 
-    def _getModulePositions(self) -> tuple[SwerveModuleState, ...]:
+    def _getModulePositions(self) -> tuple[SwerveModulePosition, ...]:
         return tuple(m.getPosition() for m in self._modules)
 
     @autolog_output("Drive/ChassisSpeeds/Measured")

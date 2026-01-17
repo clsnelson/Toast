@@ -303,7 +303,7 @@ def feedforwardCharacterization(drive: Drive) -> Command:
             ),
 
             # Allow modules to orient
-            cmd.run(lambda: drive.runCharacterization(0.0), drive).withTimeout(_feedForwardStartDelay),
+            cmd.run(lambda: drive.runDriveCharacterization(0.0), drive).withTimeout(_feedForwardStartDelay),
 
             # Start timer
             cmd.runOnce(lambda: timer.restart()),
@@ -311,7 +311,7 @@ def feedforwardCharacterization(drive: Drive) -> Command:
             # Accelerate and gather data
             cmd.run(
                 lambda: (
-                    drive.runCharacterization(timer.get() * _feedForwardRampRate),
+                    drive.runDriveCharacterization(timer.get() * _feedForwardRampRate),
                     velocitySamples.append(drive.getFFCharacterizationVelocity()),
                     voltageSamples.append(timer.get() * _feedForwardRampRate)
                 ),

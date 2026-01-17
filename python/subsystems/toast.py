@@ -3,10 +3,10 @@ from typing import Final, List
 
 import pathplannerlib.config
 from pathplannerlib.config import RobotConfig
+from phoenix6.swerve import ClosedLoopOutputType
 from wpimath.geometry import Translation2d
 from wpimath.system.plant import DCMotor
 from wpimath.units import *
-
 
 """***DRIVETRAIN***"""
 
@@ -22,6 +22,10 @@ trackWidthMeters = inchesToMeters(24.0)
 # THEORETICAL max free speed of the robot. This is the robot travelling max speed in one direction.
 # Easiest way to measure this is to check a wheel's highest rot/s in Phoenix Tuner then multiply by the wheel's circumference (in meters).
 maxLinearSpeed: Final[meters_per_second] = 4.2
+
+# Maximum speed a swerve module can rotate in radians per second.
+# Used for SwerveSetpointGenerator.
+maxWheelRotationSpeed: Final[radians_per_second] = rotationsToRadians(3)
 
 # Minimum degree change needed before the steer motors move. 0.3 by default.
 steerDeadband: Final[degrees] = 0.3
@@ -52,9 +56,18 @@ steerMotor = DCMotor.krakenX60FOC(1)
 driveRatio: Final[float] = 6.746031746031747
 steerRatio: Final[float] = 21.428571428571427
 
+# Ratio of 1 azimuth rotation to drive motor rotations. Find via characterization.
+couplingRatio: Final[float] = 3.5714285714285716
+couplingRatioEnable : Final[bool] = True # If it doesn't work turn this to False
+
 # Stator limits (limits max acceleration, used to prevent brownouts)
 driveStatorLimit: Final[amperes] = 80
 steerStatorLimit: Final[amperes] = 60
+
+# Loop outputs (Determines PID units and other... stuff ig)
+driveClosedLoopOutput: Final[ClosedLoopOutputType] = ClosedLoopOutputType.VOLTAGE
+steerClosedLoopOutput: Final[ClosedLoopOutputType] = ClosedLoopOutputType.VOLTAGE
+
 
 ### MODULE CONFIGS
 @dataclass
