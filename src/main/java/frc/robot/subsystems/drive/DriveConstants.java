@@ -53,7 +53,7 @@ public class DriveConstants {
                   DCMotor.getKrakenX60Foc(1),
                   COTS.WHEELS.DEFAULT_NEOPRENE_TREAD.cof,
                   2)) // L2 Gear ratio
-          .withTrackLengthTrackWidth(Inches.of(trackWidthMeters), Inches.of(trackWidthMeters))
+          .withTrackLengthTrackWidth(Meters.of(trackWidthMeters), Meters.of(trackWidthMeters))
           .withBumperSize(Inches.of(37), Inches.of(37))
           .withRobotMass(Kilogram.of(ROBOT_MASS_KG));
 

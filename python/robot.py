@@ -23,7 +23,7 @@ class Robot(LoggedRobot):
 
     def __init__(self) -> None:
         super().__init__()
-
+        Logger.recordMetadata("Language", "Python")
         Logger.recordMetadata("TuningMode", str(Constants.tuningMode).lower())
         Logger.recordMetadata("RuntimeType", RobotBase.getRuntimeType().name)
         Logger.recordMetadata("RobotMode", Constants.currentMode.name)

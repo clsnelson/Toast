@@ -21,7 +21,7 @@ class Constants:
     simMode: Final[Mode] = Mode.SIM
     currentMode: Final[Mode] = Mode.REAL if RobotBase.isReal() else simMode
 
-    FIELD_LAYOUT: Final[AprilTagFieldLayout] = AprilTagFieldLayout.loadField(AprilTagField.k2025ReefscapeWelded)
+    FIELD_LAYOUT: Final[AprilTagFieldLayout] = AprilTagFieldLayout.loadField(AprilTagField.k2026RebuiltWelded)
 
     class AutoAlignConstants:
         translationkP = 9.0
